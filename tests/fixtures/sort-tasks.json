@@ -1,0 +1,10 @@
+{
+  "items": [
+    { "id": "aaaaaaaaaaaaaa1", "title": "ohne Datum", "done": false, "important": false, "dueDate": null, "sort": 1 },
+    { "id": "aaaaaaaaaaaaaa2", "title": "erledigt", "done": true, "important": true, "dueDate": "2026-10-01", "sort": 2 },
+    { "id": "aaaaaaaaaaaaaa3", "title": "später", "done": false, "important": false, "dueDate": "2026-10-30", "sort": 3 },
+    { "id": "aaaaaaaaaaaaaa4", "title": "wichtig", "done": false, "important": true, "dueDate": null, "sort": 4 },
+    { "id": "aaaaaaaaaaaaaa5", "title": "bald", "done": false, "important": false, "dueDate": "2026-10-20", "sort": 5 }
+  ],
+  "expected": ["aaaaaaaaaaaaaa4", "aaaaaaaaaaaaaa5", "aaaaaaaaaaaaaa3", "aaaaaaaaaaaaaa1", "aaaaaaaaaaaaaa2"]
+}

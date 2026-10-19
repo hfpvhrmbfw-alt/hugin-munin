@@ -1,0 +1,10 @@
+{
+  "app": "hugin-munin", "version": 1, "exportedAt": "2026-10-19T12:00:00.000Z",
+  "settings": { "theme": "dark", "serverUrl": "https://macmini.example.ts.net/" },
+  "lists": [ { "id": "list00000000001", "household": "house0000000001", "kind": "shopping", "name": "Wocheneinkauf", "changedAt": 1, "sort": 1 } ],
+  "items": [
+    { "id": "item00000000001", "household": "house0000000001", "list": "list00000000001", "title": "Milch", "quantity": "2", "category": "dairy", "changedAt": 1 },
+    { "id": "kaputt", "list": "list00000000001", "title": "ungültige ID" }
+  ],
+  "events": [ { "id": "even00000000001", "household": "house0000000001", "title": "Zahnarzt", "startDate": "2026-10-22", "startTime": "09:30", "endTime": "08:00", "changedAt": 1 } ]
+}
