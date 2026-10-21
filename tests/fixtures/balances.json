@@ -1,0 +1,17 @@
+[
+  { "name": "eine Ausgabe für beide", "people": ["aaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbb"],
+    "expenses": [ { "amount": 3001, "paidBy": "aaaaaaaaaaaaaaa", "people": [] } ],
+    "balances": [ { "person": "aaaaaaaaaaaaaaa", "cents": 1500 }, { "person": "bbbbbbbbbbbbbbb", "cents": -1500 } ],
+    "transfers": [ { "from": "bbbbbbbbbbbbbbb", "to": "aaaaaaaaaaaaaaa", "cents": 1500 } ] },
+  { "name": "Ausgabe nur für die andere Person, dann Ausgleich", "people": ["aaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbb"],
+    "expenses": [ { "amount": 2000, "paidBy": "aaaaaaaaaaaaaaa", "people": ["bbbbbbbbbbbbbbb"] },
+                  { "amount": 1000, "paidBy": "bbbbbbbbbbbbbbb", "people": [] },
+                  { "kind": "settle", "amount": 1500, "paidBy": "bbbbbbbbbbbbbbb", "people": ["aaaaaaaaaaaaaaa"] } ],
+    "balances": [ { "person": "aaaaaaaaaaaaaaa", "cents": 0 }, { "person": "bbbbbbbbbbbbbbb", "cents": 0 } ],
+    "transfers": [] },
+  { "name": "drei Personen, wenige Überweisungen", "people": ["aaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbb", "ccccccccccccccc"],
+    "expenses": [ { "amount": 9000, "paidBy": "aaaaaaaaaaaaaaa", "people": [] },
+                  { "amount": 3000, "paidBy": "bbbbbbbbbbbbbbb", "people": [] } ],
+    "balances": [ { "person": "aaaaaaaaaaaaaaa", "cents": 5000 }, { "person": "bbbbbbbbbbbbbbb", "cents": -1000 }, { "person": "ccccccccccccccc", "cents": -4000 } ],
+    "transfers": [ { "from": "ccccccccccccccc", "to": "aaaaaaaaaaaaaaa", "cents": 4000 }, { "from": "bbbbbbbbbbbbbbb", "to": "aaaaaaaaaaaaaaa", "cents": 1000 } ] }
+]

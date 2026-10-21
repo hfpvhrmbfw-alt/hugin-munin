@@ -1,6 +1,8 @@
 // Speicher im Arbeitsspeicher, gleiche Schnittstelle wie src/storage.js. Für Tests.
+import { COLLECTIONS } from '../src/model.js';
+
 export function memStore() {
-  const data = { lists: new Map(), items: new Map(), events: new Map() };
+  const data = Object.fromEntries(COLLECTIONS.map((c) => [c, new Map()]));
   const meta = new Map();
   const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
   return {

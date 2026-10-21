@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { createClient, markDirty, syncOnce, ApiError } from '../src/sync.js';
-import { makeId, newList, newItem, change } from '../src/model.js';
+import { makeId, newList, newItem, newRecord, change } from '../src/model.js';
 import { memStore } from './memstore.js';
 
 const URL_ = process.env.PB_URL || 'http://127.0.0.1:8090';
@@ -82,4 +82,34 @@ test('zwei Geräte gleichen über PocketBase ab', async () => {
 
   // Haushalt wechseln ist nicht erlaubt
   await assert.rejects(anna.c.request('PATCH', `/api/collections/lists/records/${list.id}`, { household: id(), changedAt: 99999 }), ApiError);
+
+  // Module (Schema 2): Notiz, Ausgabe, Haushaltsplan, Projekt kommen beim Partner an
+  const note = newRecord('notes', ctx(anna, 5000), { title: 'WLAN', body: 'steht am Router', pinned: true });
+  const exp = newRecord('expenses', ctx(anna, 5001), { title: 'Einkauf', amount: 3050, date: '2026-10-21', paidBy: anna.u.id, people: [anna.u.id, partner.u.id] });
+  const chore = newRecord('chores', ctx(anna, 5002), { title: 'Bad', startDate: '2026-10-19', people: [anna.u.id, partner.u.id] });
+  const project = newList(ctx(anna, 5003), 'project', 'Keller');
+  const contact = newRecord('contacts', ctx(anna, 5004), { name: 'Oma', birthday: '02-29', birthYear: 1948 });
+  const meal = newRecord('meals', ctx(anna, 5005), { date: '2026-10-21', slot: 'dinner', title: 'Suppe' });
+  for (const [c, r] of [['notes', note], ['expenses', exp], ['chores', chore], ['lists', project], ['contacts', contact], ['meals', meal]]) {
+    await anna.store.put(c, r); await markDirty(anna.store, c, r);
+  }
+  await syncOnce(anna.c, anna.store, house.id);
+  assert.deepEqual(await anna.store.getMeta('outbox'), {});
+  await syncOnce(partner.c, partner.store, house.id);
+  assert.deepEqual((await partner.store.all('notes'))[0], note);
+  assert.deepEqual((await partner.store.all('expenses'))[0], exp);
+  assert.deepEqual((await partner.store.all('chores'))[0], chore);
+  assert.deepEqual((await partner.store.all('contacts'))[0], contact);
+  assert.deepEqual((await partner.store.all('meals'))[0], meal);
+  assert.ok((await partner.store.all('lists')).some((l) => l.id === project.id && l.kind === 'project'));
+
+  // Private Geschenkidee sieht der Partner nicht, eine geteilte schon; fremder owner wird abgelehnt
+  const secret = newRecord('gifts', ctx(anna, 6000), { forName: 'Partner', title: 'Uhr', private: true, owner: anna.u.id });
+  const shared = newRecord('gifts', ctx(anna, 6001), { forName: 'Oma', title: 'Blumen', private: false, owner: anna.u.id });
+  for (const g of [secret, shared]) { await anna.store.put('gifts', g); await markDirty(anna.store, 'gifts', g); }
+  await syncOnce(anna.c, anna.store, house.id);
+  await syncOnce(partner.c, partner.store, house.id);
+  assert.deepEqual((await partner.store.all('gifts')).map((g) => g.title), ['Blumen']);
+  await assert.rejects(partner.c.request('POST', '/api/collections/gifts/records', { ...shared, id: id(), private: true, owner: anna.u.id }), ApiError);
+  await assert.rejects(partner.c.request('PATCH', `/api/collections/gifts/records/${secret.id}`, { title: 'x', changedAt: 99999 }), ApiError);
 });

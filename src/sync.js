@@ -77,6 +77,8 @@ async function push(client, store) {
       try {
         await client.request('POST', `/api/collections/${collection}/records`, body);
       } catch (err2) {
+        // 404 beim Anlegen: Sammlung fehlt, der Server ist noch nicht aktualisiert. Später erneut versuchen.
+        if (err2 instanceof ApiError && err2.status === 404) continue;
         // 400 heißt hier: Eintrag gibt es schon, aber der Server hat eine neuere Fassung.
         // Die kommt beim Abrufen und wird dort zusammengeführt.
         if (!(err2 instanceof ApiError) || err2.status !== 400) throw err2;
@@ -99,13 +101,21 @@ async function pull(client, store, household) {
     const since = cursors[c] || '';
     const filter = encodeURIComponent(`household = "${household}"` + (since ? ` && updated >= "${since}"` : ''));
     let page = 1; let raw = [];
+    let missing = false;
     for (;;) {
-      const res = await client.request('GET', `/api/collections/${c}/records?filter=${filter}&sort=updated&perPage=${PAGE}&page=${page}&skipTotal=1`);
+      let res;
+      try {
+        res = await client.request('GET', `/api/collections/${c}/records?filter=${filter}&sort=updated&perPage=${PAGE}&page=${page}&skipTotal=1`);
+      } catch (err) {
+        // Sammlung gibt es auf einem älteren Server noch nicht: überspringen statt den ganzen Abgleich abzubrechen.
+        if (err instanceof ApiError && err.status === 404) { missing = true; break; }
+        throw err;
+      }
       raw = raw.concat(res.items);
       if (res.items.length < PAGE) break;
       page++;
     }
-    if (raw.length === 0) continue;
+    if (missing || raw.length === 0) continue;
     const remote = raw.map((r) => fromServer(c, r)).filter(Boolean);
     const pending = new Set(Object.keys(outbox).filter((k) => k.startsWith(c + '/')).map((k) => k.slice(c.length + 1)));
     const { put } = mergeRemote(await store.all(c), remote, pending);

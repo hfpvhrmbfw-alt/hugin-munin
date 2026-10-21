@@ -3,7 +3,7 @@
 import { COLLECTIONS } from './model.js';
 
 const DB_NAME = 'hugin-munin';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // 2: Sammlungen für die neuen Module
 const STORES = [...COLLECTIONS, 'meta'];
 
 /**

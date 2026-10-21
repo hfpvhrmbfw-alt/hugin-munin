@@ -157,3 +157,49 @@ details > div { padding:0 0 var(--s3); }
 main p { max-width:60ch; }
 
 @media (prefers-reduced-motion:no-preference) { .item, .btn, .iconbtn, .tabbar [role="tab"], select.mini { transition:background-color .15s, color .15s, border-color .15s; } }
+
+/* ---------- Einrichtung, Speicherort, Module ---------- */
+.choices { border:0; padding:0; margin:0; display:grid; }
+.choices legend { padding:var(--s4) 0 var(--s2); color:var(--muted); }
+.choice { display:flex; align-items:flex-start; gap:var(--s3); padding:var(--s3) 0; border-bottom:1px solid var(--line); cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.choice:last-child { border-bottom:0; }
+.choice input { appearance:none; flex:none; width:22px; height:22px; margin:1px 0 0; border:1.5px solid var(--muted); background:var(--surface); border-radius:50%; cursor:pointer; }
+.choice input[type="checkbox"] { border-radius:var(--r-control-s); }
+.choice input:checked { background:var(--ink); border-color:var(--ink); box-shadow:inset 0 0 0 4px var(--surface); }
+.choice input[type="checkbox"]:checked { background:var(--accent); border-color:var(--accent); box-shadow:inset 0 0 0 3px var(--surface); }
+.choice .t { flex:1; min-width:0; }
+.choice .t > b, .choice .t > span { display:block; }
+.choice .t > b { font-weight:500; }
+.choice .t > span { color:var(--muted); font-size:14px; }
+.fields { border:0; padding:var(--s3) 0 0; margin:0; display:grid; gap:var(--s3); }
+.fields[hidden] { display:none; }
+.fields .note { margin:0; }
+.empty.small { font-size:14px; margin:0; }
+.field textarea { font:16px/1.45 var(--font-body); padding:var(--s3); background:var(--sunken); color:var(--ink); border:0; border-radius:var(--r-control); width:100%; resize:vertical; }
+.field textarea:focus { outline:none; box-shadow:inset 0 0 0 1.5px var(--accent-text); }
+.inline-field { margin:var(--s4) 0; }
+.inline-field select { width:auto; max-width:100%; }
+
+/* Pinnwand auf Heute */
+.board .pin { display:flex; align-items:flex-start; gap:var(--s2); background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:0 var(--r-card) var(--r-card) 0; padding:var(--s3) var(--s1) var(--s3) var(--s4); margin:0 0 var(--s2); }
+.board .pin .t { flex:1; min-width:0; }
+.board .pin b { display:block; font-weight:600; }
+.board .pin p { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; }
+.board .pin .cap { color:var(--faint); }
+.board .pin .iconbtn { width:36px; height:36px; }
+
+/* Projekte */
+.bigtitle.inline { margin:0; flex:1; min-width:0; font-size:clamp(24px,7vw,32px); overflow-wrap:anywhere; }
+.bar { height:4px; background:var(--sunken); border-radius:2px; overflow:hidden; margin:0 0 var(--s3); }
+.bar span { display:block; height:100%; background:var(--accent); }
+
+/* Bereiche unter Mehr */
+.item .ico svg, button.item > svg { width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+button.item > svg { color:var(--faint); }
+.item .ico { display:grid; color:var(--muted); }
+.item select.mini.status { width:auto; color:var(--muted); padding:0 24px 0 var(--s2); background-position:calc(100% - 15px) 50%, calc(100% - 10px) 50%; }
+.item .sep { color:var(--faint); padding:0 .35em; }
+/* Ankreuzfelder in Formularen sind Optionen, keine erledigten Einträge */
+.check.inline input:checked + .t > b { color:inherit; text-decoration:none; }
+.check.inline input { border-radius:var(--r-control-s); }
+.check.inline input:checked { background:var(--accent); border-color:var(--accent); box-shadow:inset 0 0 0 3px var(--surface); }

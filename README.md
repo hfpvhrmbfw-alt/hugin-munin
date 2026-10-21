@@ -1,6 +1,6 @@
 # Hugin & Munin
 
-Familienplaner für zwei, benannt nach Odins Raben „Gedanke“ und „Erinnerung“: Einkauf, Aufgaben und Kalender, gemeinsam mit dem Partner. Eine PWA ohne Build-Schritt und ohne Abhängigkeiten, Abgleich über einen eigenen PocketBase-Server (z. B. auf dem Mac mini zu Hause).
+Familienplaner für zwei, benannt nach Odins Raben „Gedanke“ und „Erinnerung“: Einkauf, Aufgaben, Kalender und mehr, gemeinsam mit dem Partner. Eine PWA ohne Build-Schritt und ohne Abhängigkeiten, Abgleich über einen eigenen PocketBase-Server (z. B. auf dem Mac mini zu Hause).
 
 ## Stand: Version 1
 
@@ -12,14 +12,20 @@ Familienplaner für zwei, benannt nach Odins Raben „Gedanke“ und „Erinneru
 - **Offline:** alles wird zuerst auf dem Gerät gespeichert und später abgeglichen. Ohne Konto bleibt alles lokal.
 - **Sicherung:** Export und Import als JSON.
 
-Geplant (siehe Plan im Projekt): Ausgaben mit Ausgleich, Projekte, Notizen, Kontakte und Geburtstage mit Geschenkideen, Essensplan, Haushaltsplan mit Wechsel, Listen-Vorlagen, fremde Kalender, Pinnwand, Push-Erinnerungen.
+## Version 2: Einrichtung, Speicherort, Module
+
+- **Einrichtung beim ersten Start:** Speicherort wählen und Module ankreuzen. Beides lässt sich später unter **Mehr** ändern.
+- **Speicherort:** nur auf dem Gerät, eigener Server über Tailscale, über WireGuard, im Heimnetz, mit eigener Domain oder gemieteter Server. Je nach Wahl erscheinen die passenden Felder (Gerätename und Tailnet, IP und Port, Adresse) und die Anmeldung. Tunnel und Schlüssel (Tailscale, WireGuard) verwaltet die jeweilige VPN-App, nicht Hugin & Munin. Eine http-Adresse (WireGuard, Heimnetz) geht nur, wenn die App selbst über http vom Server geöffnet wird, nicht über GitHub Pages.
+- **Module** (an/aus, Ausgeschaltetes verschwindet überall, die Daten bleiben): Einkauf, Aufgaben, Kalender, Essensplan, Haushaltsplan im Wechsel, Ausgaben mit „wer schuldet wem“, Projekte, Notizen, Pinnwand, Kontakte & Geburtstage, Geschenkideen (auf Wunsch nur für dich sichtbar, auch auf dem Server), Listen-Vorlagen. Unten stehen Heute, die ersten drei Module und Mehr; weitere Module stehen unter Mehr → Bereiche.
+
+Noch offen: fremde Kalender (ICS) einblenden, Push-Erinnerungen.
 
 ## Aufbau
 
 | Datei | Schicht | Aufgabe |
 |---|---|---|
 | `src/model.js` | Modell | Typen, Stammdaten-IDs, Prüfung (`sanitize…`), Export/Import, Migration |
-| `src/logic.js` | Logik | reine Funktionen: Wiederholungen, Tagesplan, Sortierung, Zusammenführen beim Abgleich |
+| `src/logic.js` | Logik | reine Funktionen: Wiederholungen, Tagesplan, Sortierung, Zusammenführen beim Abgleich, Serveradresse, Haushaltsplan, Salden, Geburtstage, Vorlagen |
 | `src/storage.js` | Speicher | IndexedDB, Ersatz localStorage |
 | `src/sync.js` | Dienst | PocketBase: Anmeldung, Haushalt, Hoch- und Herunterladen, Live-Updates |
 | `src/texts.js` | Texte | Beschriftungen und Meldungen |

@@ -50,7 +50,7 @@ test('Änderung erhöht changedAt immer', () => {
 });
 
 test('Einstellungen: unbekannte Werte fallen auf Standard', () => {
-  assert.deepEqual(sanitizeSettings({ theme: 'pink', serverUrl: 'ftp://x' }), { theme: 'system', serverUrl: '' });
+  assert.deepEqual(sanitizeSettings({ theme: 'pink', serverUrl: 'ftp://x' }), { theme: 'system', serverUrl: '', storage: 'local', modules: ['shopping', 'tasks', 'calendar'] });
   assert.equal(sanitizeSettings({ serverUrl: 'https://mac.ts.net///' }).serverUrl, 'https://mac.ts.net');
 });
 
