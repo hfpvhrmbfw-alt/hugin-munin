@@ -1,0 +1,14 @@
+[
+  { "name": "wöchentlich im Wechsel, erste Woche", "chore": { "unit": "weekly", "interval": 1, "startDate": "2026-10-19", "people": ["annaaaaaaaaaaaa", "partnerrrrrrrrr"] },
+    "today": "2026-10-21", "expected": { "period": 0, "periodStart": "2026-10-19", "periodEnd": "2026-10-25", "assignee": "annaaaaaaaaaaaa", "next": "partnerrrrrrrrr", "done": false, "notYet": false } },
+  { "name": "wöchentlich im Wechsel, zweite Woche", "chore": { "unit": "weekly", "interval": 1, "startDate": "2026-10-19", "people": ["annaaaaaaaaaaaa", "partnerrrrrrrrr"], "lastDone": "2026-10-26" },
+    "today": "2026-10-28", "expected": { "period": 1, "periodStart": "2026-10-26", "periodEnd": "2026-11-01", "assignee": "partnerrrrrrrrr", "next": "annaaaaaaaaaaaa", "done": true, "notYet": false } },
+  { "name": "alle 3 Tage, Erledigt aus dem letzten Abschnitt zählt nicht", "chore": { "unit": "daily", "interval": 3, "startDate": "2026-10-01", "people": ["annaaaaaaaaaaaa"], "lastDone": "2026-10-18" },
+    "today": "2026-10-19", "expected": { "period": 6, "periodStart": "2026-10-19", "periodEnd": "2026-10-21", "assignee": "annaaaaaaaaaaaa", "next": "annaaaaaaaaaaaa", "done": false, "notYet": false } },
+  { "name": "monatlich ab dem 31.", "chore": { "unit": "monthly", "interval": 1, "startDate": "2026-01-31", "people": ["annaaaaaaaaaaaa", "partnerrrrrrrrr"] },
+    "today": "2026-03-01", "expected": { "period": 1, "periodStart": "2026-02-28", "periodEnd": "2026-03-30", "assignee": "partnerrrrrrrrr", "next": "annaaaaaaaaaaaa", "done": false, "notYet": false } },
+  { "name": "alle 2 Monate, kurz vor dem Wechsel", "chore": { "unit": "monthly", "interval": 2, "startDate": "2026-01-15", "people": [] },
+    "today": "2026-03-14", "expected": { "period": 0, "periodStart": "2026-01-15", "periodEnd": "2026-03-14", "assignee": null, "next": null, "done": false, "notYet": false } },
+  { "name": "beginnt erst später", "chore": { "unit": "weekly", "interval": 2, "startDate": "2026-11-02", "people": ["annaaaaaaaaaaaa"] },
+    "today": "2026-10-21", "expected": { "period": 0, "periodStart": "2026-11-02", "periodEnd": "2026-11-15", "assignee": "annaaaaaaaaaaaa", "next": "annaaaaaaaaaaaa", "done": false, "notYet": true } }
+]

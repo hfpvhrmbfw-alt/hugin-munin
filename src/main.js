@@ -1,13 +1,15 @@
 // Start, Aktionen, Ereignisse. Einzige Stelle, die die Uhr liest und den Zufall holt.
 import {
-  makeId, newList, newItem, newEvent, change, sanitizeSettings, buildExport, parseImport,
+  makeId, newList, newItem, newEvent, newRecord, change, sanitizeSettings, buildExport, parseImport,
   DEFAULT_SETTINGS, COLLECTIONS, SANITIZERS,
 } from './model.js';
-import { splitQuickAdd, itemsOf } from './logic.js';
+import {
+  splitQuickAdd, itemsOf, serverAddress, addressWarning, guessStorage, fromTemplate, parseAmount, parseDayMonth,
+} from './logic.js';
 import * as storage from './storage.js';
 import { createClient, markDirty, syncOnce, subscribe } from './sync.js';
-import { renderShell } from './ui.js';
-import { DEFAULT_LIST_NAME, MSG, IMPORT_ERROR, SYNC, errorText } from './texts.js';
+import { renderShell, on } from './ui.js';
+import { DEFAULT_LIST_NAME, MSG, IMPORT_ERROR, SYNC, ADDRESS_ERROR, errorText } from './texts.js';
 
 const fmtTime = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' });
 
@@ -19,16 +21,20 @@ const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${St
 let store; let client = null; let unsubscribe = () => {}; let syncTimer = 0; let syncing = false; let again = false;
 
 const state = {
-  data: { lists: [], items: [], events: [] },
+  data: Object.fromEntries(COLLECTIONS.map((c) => [c, []])),
   settings: { ...DEFAULT_SETTINGS },
   session: null, // { serverUrl, token, user:{id,email,name}, household:{id,name,inviteCode}|null }
   householdId: '',
   members: [],
-  tab: 'today', shopListId: '', taskListId: '', lastCategory: 'other',
-  editing: null, calOffset: 0, flash: '',
+  tab: 'today', shopListId: '', taskListId: '', templateId: '', projectId: '', lastCategory: 'other',
+  editing: null, calOffset: 0, mealOffset: 0, flash: '',
   sync: { status: 'local', at: 0, message: '' },
   today: localToday(),
-  defaultServer: location.protocol === 'https:' ? location.origin : '',
+  setup: false, // Einrichtung beim ersten Start
+  setupMode: 'local', // gewählter Speicherort im Formular
+  pageProtocol: location.protocol,
+  // Wurde die App direkt vom Server geöffnet (z. B. über Tailscale), ist das die Serveradresse. GitHub Pages ist kein Server.
+  defaultServer: /^https?:$/.test(location.protocol) && !location.hostname.endsWith('github.io') && !['localhost', '127.0.0.1'].includes(location.hostname) ? location.origin : '',
 };
 
 // ---- Darstellung -------------------------------------------------------------
@@ -75,13 +81,58 @@ const update = (collection, id, fields) => {
   return rec ? save(collection, change(collection, rec, fields, now(), state.session?.user.id || null)) : null;
 };
 
+const LIST_KEY = { shopping: 'shopListId', tasks: 'taskListId', template: 'templateId' };
+
 async function ensureLists() {
-  for (const kind of ['shopping', 'tasks']) {
+  for (const kind of ['shopping', 'tasks', 'template']) {
     const lists = state.data.lists.filter((l) => l.kind === kind && !l.deleted && !l.archived).sort((a, b) => a.sort - b.sort);
-    if (lists.length === 0) { const l = newList(ctx(), kind, DEFAULT_LIST_NAME[kind]); await save('lists', l); lists.push(l); }
-    const key = kind === 'shopping' ? 'shopListId' : 'taskListId';
-    if (!lists.some((l) => l.id === state[key])) state[key] = lists[0].id;
+    if (lists.length === 0 && kind !== 'template') { const l = newList(ctx(), kind, DEFAULT_LIST_NAME[kind]); await save('lists', l); lists.push(l); }
+    if (!lists.some((l) => l.id === state[LIST_KEY[kind]])) state[LIST_KEY[kind]] = lists[0]?.id || '';
   }
+}
+
+async function saveSettings(fields) {
+  state.settings = sanitizeSettings({ ...state.settings, ...fields });
+  await store.setMeta('settings', state.settings);
+}
+
+/** Einträge einer Vorlage in eine Liste übernehmen. */
+async function applyTemplate(templateId, listId) {
+  const target = state.data.lists.find((l) => l.id === listId);
+  if (!templateId || !target) return;
+  const add = fromTemplate(itemsOf(state.data.items, templateId), itemsOf(state.data.items, listId));
+  for (const it of add) {
+    await save('items', newItem(ctx(), listId, it.title, target.kind === 'shopping' ? { quantity: it.quantity, category: it.category } : { note: it.note }));
+  }
+  state.tab = target.kind; state[LIST_KEY[target.kind]] = listId;
+  flash(MSG.templateApplied(add.length));
+}
+
+/**
+ * Speicherort aus dem Formular übernehmen (Einrichtung und Mehr): nur Gerät, oder anmelden / Konto anlegen.
+ * @returns {Promise<boolean>} true, wenn es geklappt hat
+ */
+async function chooseStorage(f, submitter) {
+  const fd = new FormData(f);
+  const mode = fd.get('storage') || 'local';
+  if (mode === 'local') { await saveSettings({ storage: 'local' }); return true; }
+  const addr = serverAddress(mode, { host: fd.get('host'), tailnet: fd.get('tailnet'), port: fd.get('port'), url: fd.get('url') });
+  if (!addr.ok) { alert(ADDRESS_ERROR[addr.error]); return false; }
+  if (addressWarning(addr.url, location.protocol) === 'mixed') { alert(`${MSG.mixedContent}\n\n${addr.url}`); return false; }
+  const c = createClient(addr.url);
+  const email = String(fd.get('email') || ''); const password = String(fd.get('password') || '');
+  try {
+    if (submitter?.value === 'register') {
+      try { await c.register(email, password, String(fd.get('name') || '')); } catch (err) { if (err.status) { alert(MSG.registerFailed); return false; } throw err; }
+    }
+    const r = await c.login(email, password).catch((err) => { if (err.status) { alert(MSG.loginFailed); return null; } throw err; });
+    if (!r) return false;
+    await saveSettings({ serverUrl: addr.url, storage: mode });
+    state.session = { serverUrl: addr.url, token: r.token, user: r.user, household: null };
+    await store.setMeta('session', state.session);
+    await connect();
+    return true;
+  } catch { alert(MSG.serverUnreachable); return false; }
 }
 
 /** Alle lokalen Einträge in einen anderen Haushalt verschieben (nach Beitritt). Leere Listen fallen weg. */
@@ -141,6 +192,8 @@ async function connect() {
     s.household = current ? { id: current.id, name: current.name, inviteCode: current.inviteCode } : null;
     await store.setMeta('session', s);
     if (s.household && s.household.id !== state.householdId) await moveToHousehold(s.household.id);
+    // Private Geschenkideen, die vor der Anmeldung entstanden sind, gehören ab jetzt diesem Konto.
+    for (const g of state.data.gifts.filter((x) => x.private && !x.owner)) await update('gifts', g.id, { owner: s.user.id });
     if (s.household) {
       state.members = (await client.members()).filter((m) => m.household === s.household.id);
       unsubscribe(); unsubscribe = subscribe(client, () => scheduleSync(300));
@@ -158,11 +211,11 @@ const actions = {
   tab: (el) => { state.tab = el.dataset.tab; state.editing = null; render(); },
   toggle: (el) => update('items', el.dataset.id, { done: el.checked }),
   'set-category': (el) => { state.lastCategory = el.value; return update('items', el.dataset.id, { category: el.value }); },
-  'pick-list': (el) => { state[el.dataset.kind === 'shopping' ? 'shopListId' : 'taskListId'] = el.value; render(); },
+  'pick-list': (el) => { state[LIST_KEY[el.dataset.kind]] = el.value; render(); },
   'new-list': async (el) => {
-    const name = prompt('Name der neuen Liste'); if (!name) return;
+    const name = prompt(el.dataset.kind === 'template' ? 'Name der Vorlage' : 'Name der neuen Liste', el.dataset.kind === 'template' && !state.templateId ? DEFAULT_LIST_NAME.template : ''); if (!name) return;
     const l = newList(ctx(), el.dataset.kind, name); await save('lists', l);
-    state[el.dataset.kind === 'shopping' ? 'shopListId' : 'taskListId'] = l.id; render();
+    state[LIST_KEY[el.dataset.kind]] = l.id; render();
   },
   'rename-list': async (el) => {
     const l = state.data.lists.find((x) => x.id === el.dataset.id);
@@ -180,12 +233,53 @@ const actions = {
   'cancel-edit': () => { state.editing = null; render(); },
   'delete-event': async (el) => { if (!confirm(MSG.confirmDeleteEvent)) return; await update('events', el.dataset.id, { deleted: true }); state.editing = null; render(); },
   'cal-move': (el) => { state.calOffset += Number(el.dataset.step); render(); },
-  theme: async (el) => { state.settings = sanitizeSettings({ ...state.settings, theme: el.value }); await store.setMeta('settings', state.settings); applyTheme(); render(); },
+  'meal-move': (el) => { state.mealOffset += Number(el.dataset.step); render(); },
+  theme: async (el) => { await saveSettings({ theme: el.value }); applyTheme(); render(); },
+  'pick-storage': (el) => {
+    // Nur ein- und ausblenden, nicht neu zeichnen, damit Eingetipptes erhalten bleibt.
+    state.setupMode = el.value;
+    for (const box of el.form.querySelectorAll('[data-modes]')) {
+      const show = box.dataset.modes.split(' ').includes(el.value);
+      box.hidden = !show;
+      if (box.tagName === 'FIELDSET') box.disabled = !show;
+    }
+  },
+  'toggle-module': async (el) => {
+    const set = new Set(state.settings.modules);
+    if (el.checked) set.add(el.value); else set.delete(el.value);
+    await saveSettings({ modules: [...set] }); render();
+  },
+  delete: async (el) => {
+    if (el.dataset.confirm && !confirm(MSG.confirmDelete)) return;
+    await update(el.dataset.collection, el.dataset.id, { deleted: true });
+    state.editing = null;
+    if (el.dataset.id === state.projectId) state.projectId = '';
+    if (el.dataset.collection === 'lists') await ensureLists();
+    render();
+  },
+  unpin: async (el) => { await update('notes', el.dataset.id, on(state, 'notes') ? { pinned: false } : { deleted: true }); render(); },
+  'chore-done': async (el) => {
+    await update('chores', el.dataset.id, el.checked ? { lastDone: state.today, doneBy: state.session?.user.id || null } : { lastDone: null, doneBy: null });
+    render();
+  },
+  settle: async (el) => {
+    await save('expenses', newRecord('expenses', ctx(), { kind: 'settle', title: 'Ausgleich', amount: Number(el.dataset.cents), date: state.today, paidBy: el.dataset.from, people: [el.dataset.to] }));
+    render();
+  },
+  'open-project': (el) => { state.projectId = el.dataset.id; state.editing = null; render(); scrollTo(0, 0); },
+  'archive-project': async (el) => {
+    const p = state.data.lists.find((l) => l.id === el.dataset.id);
+    await update('lists', p.id, { archived: !p.archived }); state.projectId = ''; render();
+  },
+  'gift-status': (el) => update('gifts', el.dataset.id, { status: el.value }),
+  'apply-template': (el) => applyTemplate(el.value, el.dataset.list),
+  'apply-template-from': (el) => applyTemplate(el.dataset.template, el.value),
   'sync-now': () => scheduleSync(0),
   'copy-code': async () => { try { await navigator.clipboard.writeText(state.session.household.inviteCode); flash(MSG.copied); } catch { /* Kopieren nicht erlaubt */ } },
   logout: async () => {
     if (!confirm(MSG.confirmLogout)) return;
     unsubscribe(); client = null; state.session = null; state.members = [];
+    state.setupMode = state.settings.storage;
     await store.setMeta('session', null); render();
   },
   export: async () => {
@@ -237,20 +331,80 @@ const forms = {
     else await save('events', newEvent(ctx(), fields));
     state.editing = null; render();
   },
-  login: async (f, submitter) => {
-    const serverUrl = sanitizeSettings({ serverUrl: f.serverUrl.value }).serverUrl;
-    const c = createClient(serverUrl);
-    try {
-      if (submitter?.value === 'register') {
-        try { await c.register(f.email.value, f.password.value, f.name.value); } catch (err) { if (err.status) { alert(MSG.registerFailed); return; } throw err; }
-      }
-      const r = await c.login(f.email.value, f.password.value).catch((err) => { if (err.status) { alert(MSG.loginFailed); return null; } throw err; });
-      if (!r) return;
-      state.settings = sanitizeSettings({ ...state.settings, serverUrl }); await store.setMeta('settings', state.settings);
-      state.session = { serverUrl, token: r.token, user: r.user, household: null };
-      await store.setMeta('session', state.session);
-      await connect();
-    } catch { alert(MSG.serverUnreachable); }
+  setup: async (f, submitter) => {
+    await saveSettings({ modules: new FormData(f).getAll('modules') });
+    if (!(await chooseStorage(f, submitter))) return;
+    state.setup = false; await store.setMeta('setupPending', false);
+    if (state.session && !state.session.household) state.tab = 'more';
+    render();
+  },
+  login: async (f, submitter) => { if (await chooseStorage(f, submitter)) render(); },
+  'add-pin': async (f) => {
+    await save('notes', newRecord('notes', ctx(), { body: f.body.value, pinned: true }));
+    render('form[data-form="add-pin"] [name="body"]');
+  },
+  'add-meal': async (f) => {
+    await save('meals', newRecord('meals', ctx(), { date: f.date.value, slot: f.slot.value, title: f.title.value }));
+    render('form[data-form="add-meal"] [name="title"]');
+  },
+  'save-chore': async (f) => {
+    const fields = {
+      title: f.title.value, unit: f.unit.value, interval: Number(f.interval.value) || 1, startDate: f.startDate.value,
+      people: [...f.querySelectorAll('[name="people"]:checked')].map((x) => x.value),
+    };
+    if (f.dataset.id) await update('chores', f.dataset.id, fields);
+    else await save('chores', newRecord('chores', ctx(), { ...fields }));
+    state.editing = null; render();
+  },
+  'add-expense': async (f) => {
+    const amount = parseAmount(f.amount.value);
+    if (amount === null) { alert(MSG.badAmount); return; }
+    // Beteiligte ausdrücklich speichern, damit alte Ausgaben nicht auf später Dazugekommene verteilt werden.
+    const people = [...f.querySelectorAll('[name="people"]:checked')].map((x) => x.value);
+    await save('expenses', newRecord('expenses', ctx(), {
+      kind: 'expense', title: f.title.value, amount, date: f.date.value,
+      paidBy: f.paidBy ? f.paidBy.value : state.session?.user.id || null, people,
+    }));
+    render();
+  },
+  'add-project': async (f) => {
+    const l = newList(ctx(), 'project', f.name.value); await save('lists', l);
+    state.projectId = l.id; render('form[data-form="add-step"] [name="title"]');
+  },
+  'add-step': async (f) => {
+    await save('items', newItem(ctx(), f.dataset.list, f.title.value, { dueDate: f.dueDate.value || null }));
+    render('form[data-form="add-step"] [name="title"]');
+  },
+  'save-note': async (f) => {
+    const fields = { title: f.title.value, body: f.body.value, ...(f.pinned ? { pinned: f.pinned.checked } : {}) };
+    if (!fields.title.trim() && !fields.body.trim()) return;
+    if (f.dataset.id) await update('notes', f.dataset.id, fields);
+    else await save('notes', newRecord('notes', ctx(), { ...fields }));
+    state.editing = null; render();
+  },
+  'save-contact': async (f) => {
+    const birthday = f.birthday.value.trim() ? parseDayMonth(f.birthday.value) : null;
+    if (f.birthday.value.trim() && !birthday) { alert(MSG.badBirthday); return; }
+    const fields = {
+      name: f.name.value, birthday, birthYear: Number(f.birthYear.value) || null, phone: f.phone.value,
+      email: f.email.value, address: f.address.value, note: f.note.value,
+    };
+    if (f.dataset.id) await update('contacts', f.dataset.id, fields);
+    else await save('contacts', newRecord('contacts', ctx(), { ...fields }));
+    state.editing = null; render();
+  },
+  'add-gift': async (f) => {
+    const extra = f.extra.value.trim(); const isLink = /^https?:\/\/\S+$/.test(extra);
+    await save('gifts', newRecord('gifts', ctx(), {
+      forName: f.forName.value, title: f.title.value, link: isLink ? extra : null, note: isLink ? null : extra,
+      private: f.private.checked, owner: state.session?.user.id || null,
+    }));
+    render('form[data-form="add-gift"] [name="title"]');
+  },
+  'add-template-item': async (f) => {
+    const category = f.category.value; state.lastCategory = category;
+    for (const p of splitQuickAdd(f.text.value)) await save('items', newItem(ctx(), state.templateId, p.title, { quantity: p.quantity, category }));
+    render('form[data-form="add-template-item"] [name="text"]');
   },
   'create-household': async (f) => {
     const inviteCode = rid() + rid().slice(0, 9);
@@ -274,12 +428,13 @@ const forms = {
 
 root.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
-  if (!el || el.tagName === 'SELECT' || el.type === 'checkbox' || el.type === 'file') return;
+  if (!el || isInput(el)) return;
   actions[el.dataset.action]?.(el);
 });
+const isInput = (el) => el.tagName === 'SELECT' || ['checkbox', 'radio', 'file'].includes(el.type);
 root.addEventListener('change', (e) => {
   const el = e.target.closest('[data-action]');
-  if (el && (el.tagName === 'SELECT' || el.type === 'checkbox' || el.type === 'file')) actions[el.dataset.action]?.(el);
+  if (el && isInput(el)) actions[el.dataset.action]?.(el);
 });
 root.addEventListener('submit', (e) => {
   const f = e.target.closest('form[data-form]'); if (!f) return;
@@ -300,12 +455,17 @@ setInterval(() => scheduleSync(0), 60000);
 
 async function start() {
   store = await storage.open();
-  state.settings = sanitizeSettings((await store.getMeta('settings')) || DEFAULT_SETTINGS);
+  const savedSettings = await store.getMeta('settings');
+  state.settings = sanitizeSettings(savedSettings || { ...DEFAULT_SETTINGS, storage: guessStorage(state.defaultServer), serverUrl: state.defaultServer });
+  state.setupMode = state.settings.storage;
   state.householdId = (await store.getMeta('household')) || rid();
   await store.setMeta('household', state.householdId);
   state.session = (await store.getMeta('session')) || null;
   applyTheme();
   await loadData();
+  // Erster Start: noch nichts gespeichert (Version 1 hatte schon Listen, dann keine Einrichtung).
+  if (!savedSettings && !state.session && state.data.lists.length === 0) await store.setMeta('setupPending', true);
+  state.setup = (await store.getMeta('setupPending')) === true;
   await ensureLists();
   render();
   if (state.session) await connect();

@@ -14,7 +14,9 @@
 ## Datentypen (Skizze)
 
 ```swift
-enum ListKind: String, Codable { case shopping, tasks }
+enum ListKind: String, Codable { case shopping, tasks, project, template }
+enum StorageMode: String, Codable { case local, tailscale, wireguard, lan, domain, hosted }
+enum Module: String, Codable { case shopping, tasks, calendar, meals, chores, expenses, projects, notes, board, contacts, gifts, templates }
 enum Repeat: String, Codable { case none, daily, weekly, monthly, yearly }
 
 struct Item: Codable, Identifiable {

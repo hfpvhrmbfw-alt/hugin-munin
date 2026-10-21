@@ -56,11 +56,19 @@ PocketBase startet jetzt bei jedem Hochfahren, auch ohne Anmeldung am Mac, und n
 
 Die genauen Menüs können sich bei Tailscale ändern; maßgeblich ist deren Dokumentation.
 
+### Andere Wege zum Mac mini
+
+Bei der Einrichtung der App lässt sich statt Tailscale auch wählen:
+
+- **WireGuard:** eigener Tunnel, z. B. von der FritzBox (Internet → Freigaben → VPN (WireGuard)). Auf dem Handy die WireGuard-App, in Hugin & Munin die IP des Mac mini im Tunnel und Port 8090 eintragen. Da das ohne HTTPS läuft, die App dann über `http://<ip>:8090` öffnen, nicht über GitHub Pages.
+- **Heimnetz:** `http://macmini.local:8090` oder die IP im WLAN. Unterwegs wird nur auf dem Handy gespeichert und zu Hause abgeglichen. Auch hier die App über diese Adresse öffnen.
+- **Eigene Domain:** z. B. Cloudflare Tunnel (`cloudflared`) auf dem Mac mini, der `https://planer.deine-domain.de` auf `http://127.0.0.1:8090` leitet. Der Server ist dann aus dem Internet erreichbar: Registrierung nach dem Anlegen eurer Konten unbedingt sperren (siehe unten).
+
 ## 5. App auf den Handys
 
 1. Adresse aus Schritt 4 in Safari öffnen.
 2. Teilen → „Zum Home-Bildschirm“.
-3. In der App unter **Mehr**: Server ist schon eingetragen. Neues Konto anlegen, Haushalt gründen.
+3. Bei der Einrichtung ist „Eigener Server über Tailscale“ schon gewählt und die Adresse eingetragen. Module ankreuzen, neues Konto anlegen, danach unter **Mehr** den Haushalt gründen.
 4. Den Einladungscode an deinen Partner schicken. Er legt ebenfalls ein Konto an und tritt mit dem Code bei.
 
 Danach in der PocketBase-Verwaltung (`https://macmini.<name>.ts.net/_/`) bei der Sammlung **users** die „Create rule“ auf „Superusers only“ stellen, damit niemand weiteres ein Konto anlegen kann.
