@@ -3,3 +3,6 @@ server/pb_data/
 server/pocketbase
 *.zip
 .DS_Store
+mac/dist/
+mac/app/.build/
+mac/server/hm-server
