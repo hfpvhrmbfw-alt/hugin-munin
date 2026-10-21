@@ -1,9 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#E8451C"/>
-  <!-- zwei Raben: Hugin und Munin, einander zugewandt -->
-  <g fill="#111111">
-    <path d="M96 330c10-62 52-110 112-122 16-28 44-44 72-40-14 10-22 22-24 36 18 6 30 20 34 38-22-8-42-6-58 6 6 40-10 78-46 104-30 22-62 28-90 22l-48 38 14-52c-0-12 12-22 34-30z"/>
-    <path d="M416 330c-10-62-52-110-112-122-16-28-44-44-72-40 14 10 22 22 24 36-18 6-30 20-34 38 22-8 42-6 58 6-6 40 10 78 46 104 30 22 62 28 90 22l48 38-14-52c0-12-12-22-34-30z" opacity=".85"/>
+  <!-- Hugin (Gedanke) und Munin (Erinnerung), einander zugewandt auf einem Ast. Castra · Blei -->
+  <style>
+    .bg { fill:#FAFAF8 } .ink { fill:#111111 } .eye { fill:#FAFAF8 } .ast { fill:#0B7A74 }
+    @media (prefers-color-scheme: dark) { .bg, .eye { fill:#0E0E0E } .ink { fill:#EDEDEA } .ast { fill:#3EC2B8 } }
+  </style>
+  <defs>
+    <path id="r" d="M0 2C-14-10-30-18-52-22C-64-50-104-52-120-24C-164-4-190 60-178 124L-222 184L-184 178L-154 146C-96 150-30 120-40 40C-42 26-46 18-46 12Z"/>
+    <g id="rabe"><use href="#r" class="ink"/><circle cx="-74" cy="-24" r="7.5" class="eye"/></g>
+  </defs>
+  <rect width="512" height="512" class="bg"/>
+  <g transform="translate(256 262) scale(.92) translate(-256 -272)">
+    <use href="#rabe" transform="translate(230 222) scale(.74)"/>
+    <use href="#rabe" transform="translate(282 222) scale(-.74 .74)"/>
+    <rect x="128" y="334" width="256" height="11" rx="5.5" class="ast"/>
   </g>
-  <rect x="0" y="472" width="512" height="40" fill="#111111"/>
 </svg>
