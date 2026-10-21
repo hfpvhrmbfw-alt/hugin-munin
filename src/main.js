@@ -40,6 +40,7 @@ function applyTheme() {
 
 function render(focusSelector) {
   state.today = localToday();
+  state.now = fmtTime.format(new Date());
   const active = document.activeElement;
   const form = active && active.name ? active.closest('form') : null;
   const keep = focusSelector || (form ? `form[data-form="${form.dataset.form}"] [name="${active.name}"]` : null);
