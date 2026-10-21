@@ -1,0 +1,39 @@
+name: Mac-App
+
+on:
+  push:
+    paths: ["mac/**", "server/**", "src/**", "index.html", "styles.css", "sw.js", ".github/workflows/mac-app.yml"]
+  pull_request:
+    paths: ["mac/**", "server/**", ".github/workflows/mac-app.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: mac/server/go.mod
+          cache-dependency-path: mac/server/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Server prüfen
+        working-directory: mac/server
+        run: go vet ./...
+      - name: App bauen
+        run: VERSION="0.1.${{ github.run_number }}" sh mac/build-app.sh
+      - name: Abgleich gegen den gebauten Server testen
+        run: |
+          S="$RUNNER_TEMP/hm" && mkdir -p "$S"
+          R="mac/dist/Hugin & Munin.app/Contents/Resources/server"
+          "$R/hm-server" serve --http=127.0.0.1:8090 --dir="$S/pb_data" \
+            --hooksDir="$R/pb_hooks" --migrationsDir="$R/pb_migrations" --publicDir="$R/pb_public" > "$S/log" 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8090/api/health && break; sleep 1; done
+          curl -sf http://127.0.0.1:8090/api/hm/server-status
+          PB_URL=http://127.0.0.1:8090 node --test tests/sync.integration.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HuginMunin-mac
+          path: mac/dist/*.zip

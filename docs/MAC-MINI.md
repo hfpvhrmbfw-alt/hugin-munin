@@ -1,5 +1,7 @@
 # Mac mini als Server einrichten
 
+Einfacher geht es mit der [Mac-App](MAC-APP.md): Sie bringt Server und Tailscale mit und ersetzt die Schritte 2 bis 4. Diese Anleitung bleibt für den Betrieb ohne App.
+
 Ziel: PocketBase läuft dauerhaft auf dem Mac mini, liefert die App aus und gleicht ab. Von unterwegs erreicht ihr ihn über Tailscale unter einer HTTPS-Adresse wie `https://macmini.<name>.ts.net`.
 
 ## 1. Mac wach halten

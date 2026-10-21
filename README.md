@@ -25,10 +25,11 @@ Geplant (siehe Plan im Projekt): Ausgaben mit Ausgleich, Projekte, Notizen, Kont
 | `src/texts.js` | Texte | Beschriftungen und Meldungen |
 | `src/ui.js`, `src/main.js` | Oberfläche | Rendering, Aktionen, Start; einzige Stelle mit Uhr und Zufall |
 | `server/` | Server | PocketBase-Migration (Sammlungen, Regeln), Hook für Beitritt und Mitglieder, Startdatei für macOS |
+| `mac/` | Mac-App | Server mit eingebautem Tailscale (Go) und Menüleisten-App (SwiftUI), siehe [Mac-App](docs/MAC-APP.md) |
 
 Abhängigkeiten zeigen nur nach innen: Oberfläche → Logik/Speicher/Dienst → Modell.
 
-Mehr dazu: [Datenmodell](docs/DATENMODELL.md) · [Mac mini einrichten](docs/MAC-MINI.md) · [Weg nach Swift](docs/SWIFT.md)
+Mehr dazu: [Datenmodell](docs/DATENMODELL.md) · [Mac mini einrichten](docs/MAC-MINI.md) · [Mac-App](docs/MAC-APP.md) · [Weg nach Swift](docs/SWIFT.md)
 
 ## Ausprobieren
 
