@@ -1,5 +1,5 @@
 // Service Worker: App-Hülle offline verfügbar machen. Daten laufen nie über den Cache.
-const VERSION = 'hm-3';
+const VERSION = 'hm-4';
 const SHELL = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'src/main.js', 'src/model.js', 'src/logic.js', 'src/storage.js', 'src/sync.js', 'src/texts.js', 'src/ui.js',
