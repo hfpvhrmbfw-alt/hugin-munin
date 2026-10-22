@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { createClient, markDirty, syncOnce, ApiError } from '../src/sync.js';
-import { makeId, newList, newItem, newRecord, change } from '../src/model.js';
+import { makeId, newList, newItem, newRecord, newEvent, change } from '../src/model.js';
 import { memStore } from './memstore.js';
 
 const URL_ = process.env.PB_URL || 'http://127.0.0.1:8090';
@@ -112,4 +112,42 @@ test('zwei Geräte gleichen über PocketBase ab', async () => {
   assert.deepEqual((await partner.store.all('gifts')).map((g) => g.title), ['Blumen']);
   await assert.rejects(partner.c.request('POST', '/api/collections/gifts/records', { ...shared, id: id(), private: true, owner: anna.u.id }), ApiError);
   await assert.rejects(partner.c.request('PATCH', `/api/collections/gifts/records/${secret.id}`, { title: 'x', changedAt: 99999 }), ApiError);
+});
+
+test('kalender-abo: geheimer link mit den terminen des haushalts', async () => {
+  const anna = await user('Anna');
+  const fremd = await user('Fremd');
+  const house = await anna.c.createHousehold({ name: 'Wir', members: [anna.u.id], inviteCode: id() + id() });
+  assert.equal(await anna.c.feedToken(house.id), '');
+  await assert.rejects(fremd.c.newFeedToken(house.id), (e) => e instanceof ApiError && e.status === 404);
+
+  const ev = newEvent({ id: id(), household: house.id, now: 1000, user: anna.u.id },
+    { title: 'Schwimmen, Halle 2', startDate: '2099-11-03', startTime: '17:00', endTime: '18:00', repeat: 'weekly', people: [anna.u.id] });
+  await anna.store.put('events', ev); await markDirty(anna.store, 'events', ev);
+  await syncOnce(anna.c, anna.store, house.id);
+
+  const token = await anna.c.newFeedToken(house.id);
+  assert.match(token, /^[a-z0-9]{40}$/);
+  assert.equal(await anna.c.feedToken(house.id), token);
+  const h = await anna.c.request('GET', `/api/collections/households/records/${house.id}`);
+  assert.equal(h.feedToken, undefined);
+  await anna.c.request('PATCH', `/api/collections/households/records/${house.id}`, { feedToken: 'x'.repeat(40) }).catch(() => {});
+  assert.equal(await anna.c.feedToken(house.id), token);
+
+  const res = await fetch(`${URL_}/api/hm/feed/${token}.ics`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /text\/calendar/);
+  const text = await res.text();
+  assert.match(text, /X-WR-CALNAME:Wir/);
+  assert.match(text, /SUMMARY:Schwimmen\\, Halle 2/);
+  assert.match(text, /DTSTART:20991103T170000/);
+  assert.match(text, /RRULE:FREQ=WEEKLY/);
+  assert.match(text, /DESCRIPTION:wer: Anna/);
+
+  const renewed = await anna.c.newFeedToken(house.id);
+  assert.notEqual(renewed, token);
+  assert.equal((await fetch(`${URL_}/api/hm/feed/${token}.ics`)).status, 404);
+  await anna.c.feedOff(house.id);
+  assert.equal((await fetch(`${URL_}/api/hm/feed/${renewed}.ics`)).status, 404);
+  assert.equal(await anna.c.feedToken(house.id), '');
 });

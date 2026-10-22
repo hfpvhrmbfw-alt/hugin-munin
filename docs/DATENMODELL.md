@@ -34,6 +34,8 @@ Alle Einträge gehören zu einem **Haushalt**. IDs haben das PocketBase-Format (
 
 **calendars** (fremde Kalender): `title`, `url` (https, `webcal://` wird beim Speichern zu `https://`). Die Termine daraus werden nicht gespeichert und nicht abgeglichen: jedes Gerät lädt die Datei (über `/api/hm/ics` vom eigenen Server, ohne Server direkt) und rechnet sie mit `parseIcs` in Termine um. Zwischengespeichert in `meta.feeds`, neu geladen alle 30 Minuten. Solche Termine haben zusätzlich `feed` (ID des Kalenders) und `skip` (ausfallende Tage einer Serie).
 
+**households.feedToken** (Kalender-Abo): zufälliger Schlüssel aus 40 Zeichen, leer = aus. Versteckt, nur über `/api/hm/feed-token` (GET/POST/DELETE, nur Mitglieder) zu lesen und zu ändern. `GET /api/hm/feed/<schlüssel>.ics` liefert ohne Anmeldung die Termine des Haushalts als ICS (Zeiten ohne Zeitzone, Serien als RRULE, Namen der Personen in der Beschreibung, einmalige Termine älter als ein Jahr fallen weg). Erzeugt in `server/pb_hooks/feed.cjs`.
+
 **households** (nur Server): `name`, `members` (Benutzer-IDs), `inviteCode`
 
 **push_subs** (nur Server): `user`, `endpoint`, `p256dh`, `auth`. Ein Eintrag je Gerät mit eingeschalteten Erinnerungen; jede Person sieht nur ihre eigenen.

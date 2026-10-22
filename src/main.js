@@ -5,11 +5,11 @@ import {
 } from './model.js';
 import {
   splitQuickAdd, itemsOf, serverAddress, addressWarning, guessStorage, fromTemplate, parseAmount, parseDayMonth,
-  shoppingHistory, parseIcs, addDays, alive, guessCategory,
+  shoppingHistory, parseIcs, icsName, addDays, alive, guessCategory,
 } from './logic.js';
 import * as storage from './storage.js';
 import { createClient, markDirty, syncOnce, subscribe } from './sync.js';
-import { renderShell, on, shareText } from './ui.js';
+import { renderShell, on, shareText, aboUrl } from './ui.js';
 import { HOPPER_SVG } from './raven.js';
 import { DEFAULT_LIST_NAME, MSG, IMPORT_ERROR, SYNC, ADDRESS_ERROR, errorText } from './texts.js';
 
@@ -33,6 +33,7 @@ const state = {
   undo: null, // { text, changes:[{collection, id, fields}] } für „rückgängig“
   query: '', prevTab: 'today',
   feeds: {}, // fremde Kalender: { [calendarId]: { url, at, events, error } }
+  feedLink: '', // Kalender-Abo: geheimer Schlüssel, '' = aus, null = Server kennt es nicht
   push: '', // Erinnerungen auf diesem Gerät, siehe pushSection in ui.js
   lastExport: '',
   installHint: '', // 'ios' | 'prompt' | '' : Hinweis „auf den Home-Bildschirm“
@@ -235,7 +236,11 @@ async function refreshFeeds(force = false) {
           ? await fetch(`${s.serverUrl}/api/hm/ics?url=${encodeURIComponent(c.url)}`, { headers: { Authorization: client?.token || s.token } })
           : await fetch(c.url);
         if (!res.ok) throw new Error(String(res.status));
-        next = { url: c.url, at: now(), events: parseIcs(await res.text(), c.id, ZONE, addDays(state.today, -60)), error: '' };
+        const text = await res.text();
+        next = { url: c.url, at: now(), events: parseIcs(text, c.id, ZONE, addDays(state.today, -60)), error: '' };
+        // Ohne eigenen Namen den des Kalenders übernehmen (Apple-Kalender bringen ihn mit), für alle im Haushalt.
+        const name = !c.title && icsName(text);
+        if (name) await update('calendars', c.id, { title: name });
       } catch (err) {
         // Alte Termine behalten, wenn der Kalender gerade nicht erreichbar ist.
         next = { url: c.url, at: now(), events: f?.url === c.url ? f.events : [], error: String(err?.message || err) };
@@ -246,6 +251,13 @@ async function refreshFeeds(force = false) {
     for (const id of Object.keys(state.feeds)) if (!cals.some((c) => c.id === id)) { const { [id]: _, ...rest } = state.feeds; state.feeds = rest; changed = true; }
     if (changed) { await store.setMeta('feeds', state.feeds); render(); }
   } finally { feedsLoading = false; }
+}
+
+/** Link des Kalender-Abos anlegen, erneuern oder abschalten (fn liefert den neuen Schlüssel). */
+async function aboChange(fn) {
+  state.editing = 'abo';
+  try { state.feedLink = await fn(); } catch { alert(MSG.aboFailed); }
+  render();
 }
 
 // ---- Erinnerungen (Web Push) -----------------------------------------------------------
@@ -350,6 +362,8 @@ async function connect() {
     for (const g of state.data.gifts.filter((x) => x.private && !x.owner)) await update('gifts', g.id, { owner: s.user.id });
     if (s.household) {
       state.members = (await client.members()).filter((m) => m.household === s.household.id);
+      // Kalender-Abo: null, wenn der Server es noch nicht kennt (ältere Mac-App).
+      state.feedLink = await client.feedToken(s.household.id).catch(() => null);
       unsubscribe(); unsubscribe = subscribe(client, () => scheduleSync(300));
       scheduleSync(0);
     }
@@ -400,6 +414,10 @@ const actions = {
     const target = root.querySelector(`[data-id="${id}"]`);
     if (target) target.scrollIntoView({ block: 'center' }); else scrollTo(0, 0);
   },
+  'abo-on': () => aboChange(() => client.newFeedToken(state.session.household.id)),
+  'abo-renew': () => confirm(MSG.aboRenewAsk) && aboChange(() => client.newFeedToken(state.session.household.id)),
+  'abo-off': () => confirm(MSG.aboOffAsk) && aboChange(async () => { await client.feedOff(state.session.household.id); return ''; }),
+  'abo-copy': async () => { try { await navigator.clipboard.writeText(aboUrl(state)); flash(MSG.aboCopied); } catch { /* Kopieren nicht erlaubt */ } },
   'reload-feeds': () => { state.editing = 'feeds'; refreshFeeds(true); },
   'push-on': () => pushOn(),
   'push-off': () => pushOff(),
