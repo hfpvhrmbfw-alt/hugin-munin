@@ -14,7 +14,12 @@ routerAdd("GET", "/api/hm/ics", (e) => {
   } catch (_) {
     throw new NotFoundError("unknown_calendar");
   }
-  const res = $http.send({ url: url, method: "GET", timeout: 20, headers: { "User-Agent": "Hugin-Munin", "Accept": "text/calendar, */*" } });
+  let res;
+  try {
+    res = $http.send({ url: url, method: "GET", timeout: 20, headers: { "User-Agent": "Mozilla/5.0 (compatible; Hugin-Munin)", "Accept": "text/calendar, */*" } });
+  } catch (_) {
+    throw new BadRequestError("feed_unreachable");
+  }
   if (res.statusCode >= 400) {
     throw new BadRequestError("feed_" + res.statusCode);
   }

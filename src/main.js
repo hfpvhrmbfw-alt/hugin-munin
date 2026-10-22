@@ -219,6 +219,15 @@ const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin'
 const FEED_TTL = 30 * 60000;
 let feedsLoading = false;
 
+/** Grund, warum ein Kalender nicht lädt, als Schlüssel für MSG.feedErrors. */
+function feedErrorCode(status, body) {
+  const m = body.match(/feed_(\d+|unreachable|too_large)/i);
+  if (m) return /^(401|403|404|410)$/.test(m[1]) ? 'gone' : m[1] === 'too_large' ? 'large' : 'remote';
+  if (/unknown_calendar/i.test(body)) return 'sync';
+  if (status === 404) return 'oldserver';
+  return status === 401 ? 'auth' : 'remote';
+}
+
 /** Kalender-Abos laden, die neu sind oder deren letzter Abruf länger als 30 Minuten her ist. */
 async function refreshFeeds(force = false) {
   if (feedsLoading) return;
@@ -230,13 +239,20 @@ async function refreshFeeds(force = false) {
       const f = state.feeds[c.id];
       if (!force && f && f.url === c.url && now() - f.at < (f.error ? 60000 : FEED_TTL)) continue;
       let next;
+      const s = state.session;
       try {
-        const s = state.session;
-        const res = s?.household
-          ? await fetch(`${s.serverUrl}/api/hm/ics?url=${encodeURIComponent(c.url)}`, { headers: { Authorization: client?.token || s.token } })
-          : await fetch(c.url);
-        if (!res.ok) throw new Error(String(res.status));
+        let res;
+        try {
+          res = s?.household
+            ? await fetch(`${s.serverUrl}/api/hm/ics?url=${encodeURIComponent(c.url)}`, { headers: { Authorization: client?.token || s.token } })
+            : await fetch(c.url);
+        } catch {
+          // Ohne Server sperrt meist der Browser (CORS), mit Server ist der Mac mini nicht erreichbar.
+          throw new Error(s?.household ? 'server' : 'local');
+        }
+        if (!res.ok) throw new Error(feedErrorCode(res.status, await res.text().catch(() => '')));
         const text = await res.text();
+        if (!/BEGIN:VCALENDAR/i.test(text)) throw new Error('notics');
         next = { url: c.url, at: now(), events: parseIcs(text, c.id, ZONE, addDays(state.today, -60)), error: '' };
         // Ohne eigenen Namen den des Kalenders übernehmen (Apple-Kalender bringen ihn mit), für alle im Haushalt.
         const name = !c.title && icsName(text);
@@ -446,7 +462,8 @@ const actions = {
   'cancel-edit': () => { state.editing = null; render(); },
   'delete-event': async (el) => { await changeWithUndo('events', [el.dataset.id], { deleted: true }, MSG.undoDeleted); state.editing = null; render(); },
   'cal-move': (el) => { state.calOffset += Number(el.dataset.step); render(); },
-  'cal-view': (el) => { state.calView = el.dataset.view; state.calOffset = 0; state.calDay = ''; render(); },
+  'cal-view': (el) => { state.calView = el.dataset.view; state.calOffset = 0; state.calDay = ''; store.setMeta('calView', state.calView); render(); },
+  'cal-month': () => { state.calView = 'month'; state.calOffset = 0; state.calDay = ''; state.editing = null; store.setMeta('calView', 'month'); state.tab = 'calendar'; render(); scrollTo(0, 0); },
   'cal-day': (el) => { state.calDay = el.dataset.date; state.editing = null; render(); },
   'meal-move': (el) => { state.mealOffset += Number(el.dataset.step); render(); },
   theme: async (el) => { await saveSettings({ theme: el.value }); applyTheme(); render(); },
@@ -791,6 +808,7 @@ async function start() {
   applyTheme();
   await loadData();
   state.feeds = (await store.getMeta('feeds')) || {};
+  state.calView = (await store.getMeta('calView')) === 'month' ? 'month' : 'list';
   state.lastExport = (await store.getMeta('lastExport')) || '';
   // Erster Start: noch nichts gespeichert (Version 1 hatte schon Listen, dann keine Einrichtung).
   if (!savedSettings && !state.session && state.data.lists.length === 0) await store.setMeta('setupPending', true);
