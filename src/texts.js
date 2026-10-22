@@ -140,7 +140,20 @@ export const MSG = {
   // Fremde Kalender
   feedsHint: 'Kalender-Abos (ICS), z. B. Schulferien, Müllabfuhr oder der Arbeitskalender. Die Adresse endet meist auf .ics oder beginnt mit webcal://. Termine daraus sind nur zum Ansehen.',
   feedsLocal: 'Ohne eigenen Server lassen sich viele Kalender nicht laden, weil der Browser fremde Seiten nicht abrufen darf.',
+  nothingLater: 'In den nächsten drei Monaten steht noch nichts an.',
+  toMonth: 'ganzer kalender als monat',
   feedError: 'nicht erreichbar',
+  feedErrors: {
+    local: 'Ohne eigenen Server lädt der Browser Apple- und die meisten anderen Kalender nicht (fremde Seiten sind gesperrt). Dafür braucht es den Mac mini als Speicherort.',
+    server: 'Der Mac mini ist gerade nicht erreichbar. Ist Tailscale an?',
+    oldserver: 'Der Server kann fremde Kalender noch nicht laden. Bitte die neue Mac-App installieren.',
+    sync: 'Der Server kennt den Kalender noch nicht. Gleich noch mal „Neu laden“.',
+    gone: 'Unter dieser Adresse gibt es keinen Kalender (mehr). Ist er noch als „Öffentlicher Kalender“ freigegeben? Sonst den Link neu kopieren.',
+    notics: 'Die Adresse ist keine Kalenderdatei. Beim Apple-Kalender den Link aus „Link teilen …“ nehmen, er beginnt mit webcal://.',
+    large: 'Der Kalender ist zu groß.',
+    auth: 'Bitte neu anmelden.',
+    remote: 'Der Kalender antwortet gerade nicht. Später noch mal versuchen.',
+  },
   feedLoaded: (n) => (n === 1 ? '1 termin' : `${n} termine`),
   appleIntro: 'Ein Kalender aus der Apple-Kalender-App (iCloud) lässt sich als öffentlicher Link freigeben und hier eintragen. Der Name kann leer bleiben, er wird dann aus dem Kalender übernommen.',
   appleIphone: [

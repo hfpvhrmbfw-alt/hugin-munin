@@ -228,7 +228,21 @@ function renderToday(state) {
   ${open}
   ${on(state, 'contacts') ? todayBirthdays(state) : ''}
   ${hasPlan ? `<section class="section"><h2 class="head2">diese woche</h2>${week || `<p class="empty">${esc(MSG.nothingWeek)}</p>`}</section>` : ''}
+  ${on(state, 'calendar') ? todayLater(state) : ''}
   ${on(state, 'board') && !pins ? todayBoard(state) : ''}`;
+}
+
+/** Termine nach dieser Woche (bis drei Monate), zum Vorausplanen. Höchstens acht, dann Verweis auf den Kalender. */
+function todayLater(state) {
+  const from = addDays(state.today, 7);
+  const occs = agenda({ ...state.data, events: state.events, items: [] }, from, addDays(state.today, 90))
+    .flatMap((d) => d.events.filter((e) => e.start === d.date || d.date === from).map((e) => ({ ...e, day: d.date })));
+  const rows = occs.slice(0, 8).map((occ) => {
+    const p = eventParts(state, occ, state.today);
+    return `<div class="item">${p.inner.replace('<span class="n">', `<span class="n">${esc(dayLabel(occ.day, state.today))} `)}</div>`;
+  }).join('');
+  return `<section class="section"><h2 class="head2">demnächst</h2>${rows || `<p class="empty">${esc(MSG.nothingLater)}</p>`}
+    <button type="button" class="item more-link" data-action="cal-month"><span class="t"><span>${esc(MSG.toMonth)}</span></span>${icon('next')}</button></section>`;
 }
 
 /** Offene Aufgaben ohne Datum, damit sie auf „heute“ nicht untergehen. Wichtige zuerst, höchstens fünf. */
@@ -463,7 +477,7 @@ function feedSection(state) {
   const cals = alive(state.data.calendars).sort((a, b) => a.title.localeCompare(b.title, 'de'));
   const rows = cals.map((c) => {
     const f = state.feeds?.[c.id];
-    const status = !f ? 'lädt …' : f.error ? MSG.feedError : `${MSG.feedLoaded(f.events.length)}${sep}${esc(new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(new Date(f.at)))}`;
+    const status = !f ? 'lädt …' : f.error ? esc(MSG.feedErrors[f.error] || MSG.feedError) : `${MSG.feedLoaded(f.events.length)}${sep}${esc(new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(new Date(f.at)))}`;
     return `<div class="item"><span class="t"><b>${esc(c.title || 'kalender')}</b><span${f?.error ? ' class="err"' : ''}>${status}</span></span>
       ${iconBtn('close', 'Kalender entfernen', `data-action="delete" data-collection="calendars" data-id="${c.id}"`)}</div>`;
   }).join('');
@@ -471,6 +485,7 @@ function feedSection(state) {
     <p class="empty small">${esc(MSG.feedsHint)}${state.session ? '' : ` ${esc(MSG.feedsLocal)}`}</p>
     ${rows}
     <details class="howto"><summary>apple-kalender einblenden</summary><div class="small">
+      ${state.session?.household ? '' : `<p class="err">${esc(MSG.feedErrors.local)}</p>`}
       <p>${esc(MSG.appleIntro)}</p>
       <p class="cap">iphone</p><ol>${MSG.appleIphone.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>
       <p class="cap">mac</p><ol>${MSG.appleMac.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>
