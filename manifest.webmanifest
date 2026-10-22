@@ -1,7 +1,7 @@
 {
   "name": "Hugin & Munin",
   "short_name": "Hugin & Munin",
-  "description": "Familienplaner für zwei: Einkauf, Aufgaben und Kalender, gemeinsam.",
+  "description": "Familienplaner für zwei: Einkauf, Aufgaben, Kalender, Essensplan, Haushalt, Ausgaben und mehr, gemeinsam und auf eurem eigenen Server.",
   "lang": "de",
   "start_url": "./",
   "scope": "./",
@@ -10,6 +10,6 @@
   "theme_color": "#FAFAF8",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
   ]
 }
