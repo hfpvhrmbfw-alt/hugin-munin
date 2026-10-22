@@ -52,6 +52,7 @@ function nthStart(event, k) {
 
 /**
  * Vorkommen eines Termins, die den Zeitraum [from, to] (beide inklusive) berühren.
+ * Termine aus fremden Kalendern können skip haben: Tage, an denen eine Serie ausfällt.
  * @returns {{eventId:string, start:string, end:string, index:number}[]} sortiert nach start
  */
 export function occurrences(event, from, to) {
@@ -77,7 +78,7 @@ export function occurrences(event, from, to) {
     }
     const s = dayNumber(start);
     if (s > toN || s > untilN) break;
-    if (s + length >= fromN) out.push({ eventId: event.id, start, end: isoFromDay(s + length), index: k });
+    if (s + length >= fromN && !event.skip?.includes(start)) out.push({ eventId: event.id, start, end: isoFromDay(s + length), index: k });
     if (event.repeat === 'none') break;
   }
   return out;
@@ -444,6 +445,251 @@ export function fromTemplate(templateItems, targetItems) {
 export function progress(items, listId) {
   const list = itemsOf(items, listId);
   return { done: list.filter((i) => i.done).length, total: list.length };
+}
+
+// ---- Einkauf: Vorschläge -------------------------------------------------------------
+
+/**
+ * Frühere Einkäufe als Vorschläge: jeder Titel einmal (Groß/klein egal), häufige und zuletzt
+ * gekaufte zuerst. Dazu der zuletzt benutzte Bereich je Titel.
+ * @param {object[]} items alle Einträge, auch erledigte und gelöschte
+ * @param {Set<string>} shopListIds Listen der Art shopping
+ * @returns {{titles:string[], category:Map<string,string>}} category: Titel klein → Bereich
+ */
+export function shoppingHistory(items, shopListIds, max = 300) {
+  const seen = new Map();
+  for (const i of items) {
+    if (!shopListIds.has(i.list) || !i.title) continue;
+    const key = i.title.toLowerCase();
+    const s = seen.get(key) || { title: i.title, n: 0, at: 0, category: null, catAt: -1 };
+    s.n++;
+    if (i.changedAt >= s.at) { s.at = i.changedAt; s.title = i.title; }
+    if (i.category && i.changedAt >= s.catAt) { s.category = i.category; s.catAt = i.changedAt; }
+    seen.set(key, s);
+  }
+  const list = [...seen.values()].sort((a, b) => b.n - a.n || b.at - a.at || a.title.localeCompare(b.title, 'de'));
+  const category = new Map();
+  for (const [k, s] of seen) if (s.category) category.set(k, s.category);
+  return { titles: list.slice(0, max).map((s) => s.title), category };
+}
+
+// ---- Suche ------------------------------------------------------------------------
+
+/** Für die Suche: klein, ohne Akzente (ä → a), damit „apfel“ auch „Äpfel“ findet. */
+export const fold = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+/**
+ * Suche über alle Bereiche. Treffer, deren Titel mit der Suche beginnt, stehen vorn; Erledigtes hinten.
+ * @param {object} data Sammlungen (Geschenke schon auf die sichtbaren gefiltert)
+ * @returns {{area:string, id:string, title:string, sub:string, list:string|null, done:boolean}[]}
+ *   area: shopping, tasks, project, calendar, notes, contacts, gifts, meals, expenses, chores
+ */
+export function search(data, query, max = 80) {
+  const q = fold(query).trim();
+  if (q.length < 2) return [];
+  const words = q.split(/\s+/);
+  const hit = (...fields) => { const text = fold(fields.filter(Boolean).join(' ')); return words.every((w) => text.includes(w)); };
+  const lists = new Map(alive(data.lists).filter((l) => l.kind !== 'template').map((l) => [l.id, l]));
+  const out = [];
+  for (const i of alive(data.items)) {
+    const l = lists.get(i.list);
+    if (l && hit(i.title, i.note, i.quantity)) out.push({ area: l.kind, id: i.id, title: i.title, sub: l.name, list: l.id, done: i.done });
+  }
+  for (const l of lists.values()) if (l.kind === 'project' && hit(l.name)) out.push({ area: 'project', id: l.id, title: l.name, sub: '', list: l.id, done: l.archived });
+  for (const e of alive(data.events)) if (hit(e.title, e.notes)) out.push({ area: 'calendar', id: e.id, title: e.title, sub: e.startDate, list: null, done: false });
+  for (const n of alive(data.notes)) if (hit(n.title, n.body)) out.push({ area: 'notes', id: n.id, title: n.title || n.body.split('\n')[0], sub: n.title ? n.body.split('\n')[0] : '', list: null, done: false });
+  for (const c of alive(data.contacts)) if (hit(c.name, c.phone, c.email, c.address, c.note)) out.push({ area: 'contacts', id: c.id, title: c.name, sub: c.phone || c.email || '', list: null, done: false });
+  for (const g of alive(data.gifts)) if (hit(g.title, g.forName, g.note)) out.push({ area: 'gifts', id: g.id, title: g.title, sub: g.forName, list: null, done: g.status === 'given' });
+  for (const m of alive(data.meals)) if (hit(m.title, m.note)) out.push({ area: 'meals', id: m.id, title: m.title, sub: m.date, list: null, done: false });
+  for (const e of alive(data.expenses)) if (e.kind === 'expense' && hit(e.title)) out.push({ area: 'expenses', id: e.id, title: e.title, sub: e.date, list: null, done: false });
+  for (const c of alive(data.chores)) if (hit(c.title)) out.push({ area: 'chores', id: c.id, title: c.title, sub: '', list: null, done: false });
+  const starts = (r) => (fold(r.title).startsWith(words[0]) ? 0 : 1);
+  return out.sort((a, b) => a.done - b.done || starts(a) - starts(b) || a.title.localeCompare(b.title, 'de')).slice(0, max);
+}
+
+// ---- Fremde Kalender (ICS) ---------------------------------------------------------------
+
+const ICS_DAYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+const ICS_FREQ = { DAILY: 'daily', WEEKLY: 'weekly', MONTHLY: 'monthly', YEARLY: 'yearly' };
+
+/** Gefaltete Zeilen zusammensetzen und in Name, Parameter, Wert zerlegen. */
+function icsProps(text) {
+  const lines = String(text).replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '').split(/\r?\n/);
+  const out = [];
+  for (const line of lines) {
+    let quoted = false; let colon = -1;
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '"') quoted = !quoted;
+      else if (line[i] === ':' && !quoted) { colon = i; break; }
+    }
+    if (colon < 1) continue;
+    const [name, ...rest] = line.slice(0, colon).split(';');
+    const params = {};
+    for (const p of rest) { const eq = p.indexOf('='); if (eq > 0) params[p.slice(0, eq).toUpperCase()] = p.slice(eq + 1).replace(/^"|"$/g, ''); }
+    out.push({ name: name.toUpperCase(), params, value: line.slice(colon + 1) });
+  }
+  return out;
+}
+
+const icsText = (v) => v.replace(/\\[nN]/g, '\n').replace(/\\([,;\\])/g, '$1').trim();
+
+const zoneFormat = new Map();
+/** Wanduhrzeit in einer Zeitzone zu einem Zeitpunkt (ms) als [y, m, d, h, min]. */
+function wallClock(ms, zone) {
+  if (!zoneFormat.has(zone)) {
+    zoneFormat.set(zone, new Intl.DateTimeFormat('en-US', {
+      timeZone: zone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+    }));
+  }
+  const p = Object.fromEntries(zoneFormat.get(zone).formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+  return [Number(p.year), Number(p.month), Number(p.day), Number(p.hour) % 24, Number(p.minute)];
+}
+
+const validZone = (zone) => { try { wallClock(0, zone); return true; } catch { return false; } };
+
+/**
+ * ICS-Datum in Ortszeit: { date:'YYYY-MM-DD', time:'HH:MM'|null }.
+ * UTC (…Z) und TZID werden nach zone umgerechnet; unbekannte TZID und „schwebende“ Zeiten gelten als Ortszeit.
+ */
+function icsDate(prop, zone) {
+  const m = prop.value.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?$/);
+  if (!m) return null;
+  const [y, mo, d, h, mi] = m.slice(1, 6).map((x) => (x === undefined ? undefined : Number(x)));
+  if (h === undefined) return { date: `${m[1]}-${m[2]}-${m[3]}`, time: null };
+  let wall = [y, mo, d, h, mi];
+  const from = m[7] ? 'UTC' : prop.params.TZID && validZone(prop.params.TZID) ? prop.params.TZID : null;
+  if (from && from !== zone) {
+    // Zeitpunkt suchen, an dem die Uhr in "from" die angegebene Zeit zeigt (zweimal nähern wegen Sommerzeit).
+    const target = Date.UTC(y, mo - 1, d, h, mi);
+    let t = target;
+    for (let i = 0; i < 2; i++) { const w = wallClock(t, from); t += target - Date.UTC(w[0], w[1] - 1, w[2], w[3], w[4]); }
+    wall = wallClock(t, zone);
+  }
+  return { date: `${wall[0]}-${pad(wall[1])}-${pad(wall[2])}`, time: `${pad(wall[3])}:${pad(wall[4])}` };
+}
+
+function icsDuration(v) {
+  const m = String(v).match(/^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?/);
+  if (!m) return 0;
+  return ((Number(m[1] || 0) * 7 + Number(m[2] || 0)) * 24 * 60) + Number(m[3] || 0) * 60 + Number(m[4] || 0);
+}
+
+const plusMinutes = (date, time, minutes) => {
+  const total = dayNumber(date) * 1440 + Number(time.slice(0, 2)) * 60 + Number(time.slice(3)) + minutes;
+  const day = Math.floor(total / 1440); const rest = total - day * 1440;
+  return { date: isoFromDay(day), time: `${pad(Math.floor(rest / 60))}:${pad(rest % 60)}` };
+};
+
+/**
+ * Kalenderdatei (ICS) in Termine im Format der App umwandeln. Unterstützt: ganztägig und mit Uhrzeit,
+ * Zeitzonen, Dauer, Wiederholung täglich/wöchentlich (auch an mehreren Wochentagen)/monatlich/jährlich mit
+ * Abstand, Ende oder Anzahl, ausfallende Tage (EXDATE) und einzeln geänderte Termine einer Serie.
+ * Seltene Regeln (z. B. „jeden 2. Dienstag im Monat“) zeigen nur den ersten Termin.
+ * @param {string} text Inhalt der .ics-Datei
+ * @param {string} feedId ID des Kalenders in der App
+ * @param {string} zone Zeitzone des Geräts, z. B. 'Europe/Berlin'
+ * @param {string} from Termine, die vor diesem Tag enden und sich nicht wiederholen, fallen weg
+ * @returns {object[]} Termine mit id, feed, title, notes, startDate, endDate, startTime, endTime, repeat,
+ *   repeatInterval, repeatUntil, skip, people, deleted
+ */
+export function parseIcs(text, feedId, zone, from, max = 3000) {
+  const raw = [];
+  let cur = null; let depth = 0;
+  for (const p of icsProps(text)) {
+    if (p.name === 'BEGIN') {
+      if (p.value.toUpperCase() === 'VEVENT' && depth === 0) { cur = { exdates: [] }; } else if (cur) depth++;
+      continue;
+    }
+    if (p.name === 'END') {
+      if (cur && depth > 0) depth--;
+      else if (cur && p.value.toUpperCase() === 'VEVENT') { raw.push(cur); cur = null; }
+      continue;
+    }
+    if (!cur || depth > 0) continue;
+    if (p.name === 'EXDATE') { for (const v of p.value.split(',')) cur.exdates.push({ ...p, value: v.trim() }); } else cur[p.name] = p;
+  }
+  const masters = new Map();
+  for (const r of raw) if (r.UID && !r['RECURRENCE-ID']) masters.set(r.UID.value, r);
+  const out = [];
+  let n = 0;
+  const push = (ev) => { if (out.length < max) out.push({ ...ev, id: `${feedId}-${n++}`, feed: feedId, notes: ev.notes || null, people: [], deleted: false }); };
+  for (const r of raw) {
+    if (!r.DTSTART || (r.STATUS && r.STATUS.value.toUpperCase() === 'CANCELLED' && !r['RECURRENCE-ID'])) continue;
+    const start = icsDate(r.DTSTART, zone);
+    if (!start) continue;
+    if (r['RECURRENCE-ID']) {
+      const master = r.UID && masters.get(r.UID.value);
+      const rid = icsDate(r['RECURRENCE-ID'], zone);
+      if (master && rid) (master.skip ||= []).push(rid.date);
+      if (r.STATUS && r.STATUS.value.toUpperCase() === 'CANCELLED') continue;
+    }
+    let end = r.DTEND ? icsDate(r.DTEND, zone) : null;
+    if (!end && r.DURATION) end = start.time ? plusMinutes(start.date, start.time, icsDuration(r.DURATION.value)) : { date: addDays(start.date, Math.max(1, Math.round(icsDuration(r.DURATION.value) / 1440))), time: null };
+    let endDate = start.date; let endTime = null;
+    if (end && !start.time) endDate = end.date > start.date ? addDays(end.date, -1) : start.date; // Ende ist bei ganztägigen exklusiv
+    if (end && start.time) {
+      if (end.time === '00:00' && end.date > start.date) { endDate = addDays(end.date, -1); endTime = end.date === addDays(start.date, 1) ? '23:59' : null; } else { endDate = end.date < start.date ? start.date : end.date; endTime = end.time; }
+      if (endDate === start.date && endTime && endTime < start.time) endTime = null;
+    }
+    const base = {
+      title: r.SUMMARY ? icsText(r.SUMMARY.value) : '', notes: r.LOCATION ? icsText(r.LOCATION.value) : null,
+      startDate: start.date, endDate, startTime: start.time, endTime, repeat: 'none', repeatInterval: 1, repeatUntil: null,
+      skip: r.exdates.map((x) => icsDate(x, zone)?.date).filter(Boolean),
+    };
+    r.base = base; // skip aus RECURRENCE-ID wird unten noch ergänzt, deshalb erst am Ende ausgeben
+    const rule = r.RRULE && !r['RECURRENCE-ID'] ? Object.fromEntries(r.RRULE.value.split(';').map((x) => x.split('=')).map(([k, v]) => [k.toUpperCase(), v])) : null;
+    r.events = rule ? expandRule(base, rule, zone) : [base];
+  }
+  for (const r of raw) {
+    if (!r.events) continue;
+    for (const ev of r.events) {
+      const skip = [...ev.skip, ...(r.skip || [])];
+      if (ev.repeat === 'none' && ev.endDate < from) continue;
+      if (ev.repeatUntil && ev.repeatUntil < from) continue;
+      push({ ...ev, skip });
+    }
+  }
+  return out;
+}
+
+/** RRULE auf die Wiederholung der App abbilden; mehrere Wochentage werden mehrere Serien. */
+function expandRule(base, rule, zone) {
+  let repeat = ICS_FREQ[rule.FREQ];
+  let interval = Math.min(99, Math.max(1, Number(rule.INTERVAL) || 1));
+  let days = rule.BYDAY ? rule.BYDAY.split(',').map((d) => d.trim().toUpperCase()) : [];
+  if (repeat === 'daily' && days.length) { repeat = 'weekly'; interval = 1; }
+  const plain = days.every((d) => ICS_DAYS.includes(d));
+  // Unbekannte Regeln (stündlich, „2. Dienstag“, mehrere Monatstage): nur der erste Termin.
+  if (!repeat || !plain || (repeat !== 'weekly' && days.length) || (rule.BYMONTHDAY && rule.BYMONTHDAY.includes(','))
+    || (rule.BYMONTH && rule.BYMONTH.includes(',')) || rule.BYSETPOS) return [base];
+  let until = rule.UNTIL ? icsDate({ value: rule.UNTIL, params: {} }, zone)?.date || null : null;
+  const count = Number(rule.COUNT) || 0;
+  if (repeat !== 'weekly' || days.length <= 1) {
+    let startDate = base.startDate;
+    if (days.length === 1) { const want = ICS_DAYS.indexOf(days[0]); startDate = addDays(startDate, (want - weekday(startDate) + 7) % 7); }
+    const span = dayNumber(base.endDate) - dayNumber(base.startDate);
+    if (count) {
+      const k = (count - 1) * interval;
+      const last = repeat === 'daily' ? addDays(startDate, k) : repeat === 'weekly' ? addDays(startDate, 7 * k)
+        : addMonths(startDate, repeat === 'monthly' ? k : 12 * k);
+      until = until && until < last ? until : last;
+    }
+    return [{ ...base, startDate, endDate: addDays(startDate, span), repeat, repeatInterval: interval, repeatUntil: until }];
+  }
+  // Wöchentlich an mehreren Tagen: je Wochentag eine Serie ab dem ersten Vorkommen nach DTSTART.
+  const monday = weekStart(base.startDate);
+  const span = dayNumber(base.endDate) - dayNumber(base.startDate);
+  if (count) {
+    const weeks = Math.ceil(count / days.length);
+    const last = addDays(monday, 7 * interval * (weeks - 1) + 6);
+    until = until && until < last ? until : last;
+  }
+  days = [...new Set(days)].sort((a, b) => ICS_DAYS.indexOf(a) - ICS_DAYS.indexOf(b));
+  return days.map((d) => {
+    let s = addDays(monday, ICS_DAYS.indexOf(d));
+    if (s < base.startDate) s = addDays(s, 7 * interval);
+    return { ...base, startDate: s, endDate: addDays(s, span), repeat: 'weekly', repeatInterval: interval, repeatUntil: until };
+  }).filter((ev) => !until || ev.startDate <= until);
 }
 
 // ---- Abgleich ------------------------------------------------------------------

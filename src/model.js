@@ -2,10 +2,10 @@
 // Keine Abhängigkeiten, keine Anzeigetexte, keine Uhr.
 
 export const APP_ID = 'hugin-munin';
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /** Sammlungen, die mit dem Server abgeglichen werden (gleiche Namen wie in PocketBase). */
-export const COLLECTIONS = ['lists', 'items', 'events', 'notes', 'expenses', 'meals', 'chores', 'contacts', 'gifts'];
+export const COLLECTIONS = ['lists', 'items', 'events', 'notes', 'expenses', 'meals', 'chores', 'contacts', 'gifts', 'calendars'];
 
 /** project = Projekt mit Schritten, template = Vorlage für Einkaufs- oder Aufgabenlisten. */
 export const LIST_KINDS = ['shopping', 'tasks', 'project', 'template'];
@@ -259,9 +259,21 @@ export function sanitizeGift(raw) {
   };
 }
 
+/**
+ * Fremder Kalender (ICS-Abo), z. B. Schulferien oder der Arbeitskalender. Die Termine selbst werden nicht
+ * abgeglichen, jedes Gerät lädt sie von url. webcal:// wird zu https://.
+ * @typedef {Base & {title:string, url:string}} Calendar
+ */
+/** @returns {Calendar|null} */
+export function sanitizeCalendar(raw) {
+  if (!raw || !isId(raw.id)) return null;
+  const url = str(raw.url, 1000).replace(/^webcals?:\/\//i, 'https://');
+  return { ...base(raw), title: str(raw.title, 80), url: /^https?:\/\/\S+$/i.test(url) ? url : '' };
+}
+
 export const SANITIZERS = {
   lists: sanitizeList, items: sanitizeItem, events: sanitizeEvent, notes: sanitizeNote, expenses: sanitizeExpense,
-  meals: sanitizeMeal, chores: sanitizeChore, contacts: sanitizeContact, gifts: sanitizeGift,
+  meals: sanitizeMeal, chores: sanitizeChore, contacts: sanitizeContact, gifts: sanitizeGift, calendars: sanitizeCalendar,
 };
 
 /** Lokale Einstellungen (werden nicht abgeglichen, gelten je Gerät). */
@@ -316,13 +328,14 @@ export function buildExport(data, settings, exportedAt) {
  * Hebt ältere Rohdaten auf die aktuelle Version. Idempotent.
  * 1 → 2: neue Sammlungen (Notizen, Ausgaben, Essen, Haushaltsplan, Kontakte, Geschenke) kommen leer dazu;
  * Einstellungen bekommen Speicherort und Module (macht sanitizeSettings).
+ * 2 → 3: fremde Kalender (calendars) kommen leer dazu.
  */
 export function upgradeRaw(raw) {
   const out = { ...raw };
   if (typeof out.version !== 'number') out.version = 1;
-  if (out.version === 1) {
+  if (out.version < SCHEMA_VERSION) {
     for (const c of COLLECTIONS) if (out[c] === undefined) out[c] = [];
-    out.version = 2;
+    out.version = SCHEMA_VERSION;
   }
   return out;
 }

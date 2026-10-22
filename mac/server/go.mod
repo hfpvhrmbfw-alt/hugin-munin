@@ -3,6 +3,8 @@ module github.com/hfpvhrmbfw-alt/hugin-munin/mac/server
 go 1.27.3
 
 require (
+	github.com/SherClockHolmes/webpush-go v1.4.0
+	github.com/pocketbase/dbx v1.12.0
 	github.com/pocketbase/pocketbase v0.40.5
 	tailscale.com v1.104.2
 )
@@ -49,7 +51,6 @@ require (
 	github.com/mitchellh/go-ps v1.0.0 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/pires/go-proxyproto v0.15.0 // indirect
-	github.com/pocketbase/dbx v1.12.0 // indirect
 	github.com/pocketbase/ozzo-validation/v4 v4.3.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/safchain/ethtool v0.7.0 // indirect

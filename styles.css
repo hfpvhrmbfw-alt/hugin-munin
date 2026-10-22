@@ -9,18 +9,22 @@
   --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:64px;
   --r-card:12px; --r-control:10px; --r-control-s:6px; --tap:48px; --row-air:16px;
   --maxw:720px; --gutter:16px; color-scheme:light;
+  /* Personen im Haushalt: ruhige Farben, nicht der Akzent */
+  --p0:#9A4A2A; --p1:#3B5B8F; --p2:#5F6A1E; --p3:#7E3D72;
 }
 [data-theme="dark"] {
   --bg:#0E0E0E; --surface:#171717; --sunken:#222222; --line:#2E2E2E; --ink:#EDEDEA; --muted:#A6A6A1; --faint:#6C6C68;
   --accent:#3EC2B8; --accent-text:#6ED6CD; --accent-hover:#5ACFC6; --accent-tint:#0F2F2C; --accent-ink:#0A0A0A;
   --ok:#7FC48F; --ok-tint:#233226; --warn:#E0B25A; --warn-tint:#352B17;
   --err:#F08A8F; --err-tint:#3A2123; --info:#8DB4EA; --info-tint:#1E2A3A; color-scheme:dark;
+  --p0:#E39A78; --p1:#93B2E6; --p2:#BFC97A; --p3:#D99BCB;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg:#0E0E0E; --surface:#171717; --sunken:#222222; --line:#2E2E2E; --ink:#EDEDEA; --muted:#A6A6A1; --faint:#6C6C68;
   --accent:#3EC2B8; --accent-text:#6ED6CD; --accent-hover:#5ACFC6; --accent-tint:#0F2F2C; --accent-ink:#0A0A0A;
   --ok:#7FC48F; --ok-tint:#233226; --warn:#E0B25A; --warn-tint:#352B17;
-  --err:#F08A8F; --err-tint:#3A2123; --info:#8DB4EA; --info-tint:#1E2A3A; color-scheme:dark; } }
+  --err:#F08A8F; --err-tint:#3A2123; --info:#8DB4EA; --info-tint:#1E2A3A; color-scheme:dark;
+  --p0:#E39A78; --p1:#93B2E6; --p2:#BFC97A; --p3:#D99BCB; } }
 @media (min-width:600px) { :root { --gutter:24px; } }
 
 * { box-sizing:border-box; }
@@ -40,7 +44,9 @@ code { font:14px var(--font-label); background:var(--sunken); padding:2px 6px; b
 .apphead { position:sticky; top:0; z-index:20; background:var(--bg); border-bottom:1px solid var(--line); padding-top:env(safe-area-inset-top, 0px); }
 .apphead .wrap { display:flex; align-items:center; justify-content:space-between; gap:var(--s3); min-height:var(--tap); }
 .apphead h1 { font:600 17px/1.2 var(--font-title); margin:0; white-space:nowrap; }
-.sync { color:var(--muted); text-align:right; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sync { color:var(--muted); text-align:right; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-left:auto; }
+.apphead .iconbtn { margin-right:calc(var(--s3) * -1); }
+.apphead .iconbtn[aria-current] { color:var(--accent-text); }
 .sync[data-status="error"], .sync[data-status="auth"] { color:var(--err); }
 
 .tabbar { position:fixed; z-index:20; left:0; right:0; bottom:0; background:var(--bg); border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom, 0px); }
@@ -203,3 +209,49 @@ button.item > svg { color:var(--faint); }
 .check.inline input:checked + .t > b { color:inherit; text-decoration:none; }
 .check.inline input { border-radius:var(--r-control-s); }
 .check.inline input:checked { background:var(--accent); border-color:var(--accent); box-shadow:inset 0 0 0 3px var(--surface); }
+
+/* ---------- Personen ---------- */
+.who { --pc:var(--p0); flex:none; display:inline-grid; place-items:center; width:24px; height:24px; border-radius:50%; font:500 12px/1 var(--font-label);
+  color:var(--pc); background:color-mix(in srgb, var(--pc) 16%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--pc) 35%, transparent); }
+.who.p1 { --pc:var(--p1); } .who.p2 { --pc:var(--p2); } .who.p3 { --pc:var(--p3); }
+.item .t .who { width:20px; height:20px; font-size:11px; vertical-align:-5px; margin-right:6px; }
+.item .t b .who { margin-right:4px; vertical-align:1px; }
+.board .pin .who { margin-top:4px; }
+
+/* ---------- Leere Seiten: Raben-Zeichnungen von Anna als Maske, Farbe aus dem Thema ---------- */
+.empty-state { display:flex; flex-direction:column; align-items:center; text-align:center; gap:var(--s3); padding:var(--s6) var(--s4) var(--s5); color:var(--muted); }
+.empty-state p { margin:0; max-width:32ch; }
+.raven { display:block; width:128px; height:128px; background:var(--muted); opacity:.9;
+  -webkit-mask:var(--raven) center / contain no-repeat; mask:var(--raven) center / contain no-repeat; }
+
+/* ---------- Rückgängig ---------- */
+.toast { position:fixed; z-index:30; left:50%; transform:translateX(-50%); bottom:calc(var(--tap) + 24px + env(safe-area-inset-bottom, 0px));
+  width:min(calc(100% - 2 * var(--gutter)), 440px); display:flex; align-items:center; justify-content:space-between; gap:var(--s3);
+  background:var(--ink); color:var(--bg); padding:var(--s1) var(--s1) var(--s1) var(--s4); border-radius:var(--r-card);
+  font:400 14px var(--font-label); box-shadow:0 6px 24px rgba(0,0,0,.18); }
+.toast .btn { background:transparent; border-color:transparent; color:var(--bg); text-decoration:underline; text-underline-offset:3px; }
+.toast .btn:hover { border-color:transparent; background:rgba(127,127,127,.2); }
+@media (prefers-reduced-motion:no-preference) { .toast { animation:toast-in .2s ease-out; } }
+@keyframes toast-in { from { opacity:0; transform:translate(-50%, 8px); } }
+
+/* ---------- Wischen und ruhiges Abhaken ---------- */
+.item[data-swipe] { position:relative; touch-action:pan-y; }
+.item.swiping { background:var(--sunken); overflow:hidden; }
+.item.swiping > * { transform:translateX(var(--dx, 0)); }
+.item.swiping::before { position:absolute; top:50%; transform:translateY(-50%); font:400 13px var(--font-label); color:var(--muted); }
+.item.swiping[data-dir="right"]::before { content:"abhaken"; left:var(--s3); }
+.item.swiping[data-dir="left"]::before { content:"löschen"; right:var(--s3); }
+.item.swiping.armed[data-dir="right"] { background:var(--ok-tint); } .item.swiping.armed[data-dir="right"]::before { color:var(--ok); }
+.item.swiping.armed[data-dir="left"] { background:var(--err-tint); } .item.swiping.armed[data-dir="left"]::before { color:var(--err); }
+.item.settling { animation:settle .42s ease-in forwards; overflow:hidden; }
+@keyframes settle {
+  0%, 35% { opacity:1; max-height:96px; }
+  100% { opacity:0; max-height:0; min-height:0; padding-top:0; padding-bottom:0; border-bottom-width:0; }
+}
+@media (prefers-reduced-motion:no-preference) { .check input { transition:background-color .2s, box-shadow .2s; } .check .t > b { transition:color .2s; } }
+
+/* ---------- Suche, fremde Kalender ---------- */
+button.item.done .t > b { color:var(--faint); text-decoration:line-through; }
+.item .t > span.err { color:var(--err); }
+.item.feed .t > b { color:var(--muted); }
+.search input[type="search"]::-webkit-search-cancel-button { -webkit-appearance:none; }

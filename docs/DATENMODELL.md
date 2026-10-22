@@ -1,4 +1,4 @@
-# Datenmodell (Schema-Version 2)
+# Datenmodell (Schema-Version 3)
 
 Alle Einträge gehören zu einem **Haushalt**. IDs haben das PocketBase-Format (15 Zeichen `a-z0-9`) und werden auf dem Gerät erzeugt, damit ein offline angelegter Eintrag auf dem Server dieselbe ID behält.
 
@@ -32,7 +32,13 @@ Alle Einträge gehören zu einem **Haushalt**. IDs haben das PocketBase-Format (
 
 **gifts**: `forName`, `contact` (optional), `title`, `note`, `link`, `status` (`idea`, `bought`, `given`), `private`, `owner`. Private Ideen sieht und ändert auf dem Server nur `owner`.
 
+**calendars** (fremde Kalender): `title`, `url` (https, `webcal://` wird beim Speichern zu `https://`). Die Termine daraus werden nicht gespeichert und nicht abgeglichen: jedes Gerät lädt die Datei (über `/api/hm/ics` vom eigenen Server, ohne Server direkt) und rechnet sie mit `parseIcs` in Termine um. Zwischengespeichert in `meta.feeds`, neu geladen alle 30 Minuten. Solche Termine haben zusätzlich `feed` (ID des Kalenders) und `skip` (ausfallende Tage einer Serie).
+
 **households** (nur Server): `name`, `members` (Benutzer-IDs), `inviteCode`
+
+**push_subs** (nur Server): `user`, `endpoint`, `p256dh`, `auth`. Ein Eintrag je Gerät mit eingeschalteten Erinnerungen; jede Person sieht nur ihre eigenen.
+
+**push_sent** (nur Server, nur für den Server lesbar): `key` je verschickter Erinnerung, z. B. `digest/2026-10-27/<user>` oder `ev/<event>/<tag>/<user>`. Nach drei Tagen gelöscht.
 
 Wiederholungen werden nicht als einzelne Termine gespeichert, sondern beim Anzeigen ausgerechnet (`occurrences` in `logic.js`). Monatlich am 31. und jährlich am 29.02. überspringen Monate bzw. Jahre ohne diesen Tag.
 

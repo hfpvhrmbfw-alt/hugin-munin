@@ -7,7 +7,7 @@ import {
 } from '../src/logic.js';
 import {
   sanitizeChore, sanitizeExpense, sanitizeContact, sanitizeMeal, sanitizeGift, sanitizeNote, sanitizeItem, sanitizeSettings,
-  parseImport, buildExport, upgradeRaw, MODULES, TAB_MODULES, STORAGE_MODES, COLLECTIONS, MEAL_SLOTS, CHORE_UNITS, GIFT_STATUS,
+  parseImport, buildExport, upgradeRaw, SCHEMA_VERSION, MODULES, TAB_MODULES, STORAGE_MODES, COLLECTIONS, MEAL_SLOTS, CHORE_UNITS, GIFT_STATUS,
 } from '../src/model.js';
 
 const fixture = (name) => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'));
@@ -155,7 +155,7 @@ test('Sicherung aus Version 1 lässt sich in Version 2 laden', () => {
   assert.deepEqual(r.settings.modules, ['shopping', 'tasks', 'calendar']);
   const raw = { app: 'hugin-munin', version: 1, lists: [] };
   assert.deepEqual(upgradeRaw(upgradeRaw(raw)), upgradeRaw(raw));
-  assert.equal(upgradeRaw(raw).version, 2);
+  assert.equal(upgradeRaw(raw).version, SCHEMA_VERSION);
 });
 
 test('Export enthält alle Sammlungen und kommt gleich zurück', () => {
