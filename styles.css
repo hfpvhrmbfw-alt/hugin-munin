@@ -242,12 +242,29 @@ button.item > svg { color:var(--faint); }
 .sync .mini { margin-right:5px; color:var(--faint); }
 .group .mini { margin-right:5px; color:var(--faint); }
 .list-end { display:flex; justify-content:center; padding:var(--s4) 0 0; color:var(--faint); font-size:22px; }
-.mini.hop { position:fixed; z-index:40; width:32px; height:32px; color:var(--ink); pointer-events:none; animation:hop .52s ease-out; }
-.mini.hop.away { animation:hop-away .5s ease-in forwards; }
-.mini.hop.still { animation:none; transition:opacity .4s; }
-.mini.hop.still.away { opacity:0; }
-@keyframes hop { 0% { opacity:0; transform:scale(.6); } 15% { opacity:1; transform:none; } 35% { transform:translateY(-9px); } 55% { transform:none; } 75% { transform:translateY(-6px); } 100% { transform:none; } }
-@keyframes hop-away { to { opacity:0; transform:translate(40px, -56px) scale(.8); } }
+/* Hüpfer beim Abhaken: zweimal hüpfen, dann davonfliegen (SVG aus src/raven.js) */
+.hopper { position:fixed; z-index:40; width:40px; height:40px; color:var(--ink); fill:currentColor; pointer-events:none; overflow:visible;
+  animation:hop-path 1.5s linear forwards; }
+.hopper .r-body { transform-box:view-box; transform-origin:150px 205px; animation:hop-body 1.5s ease-in-out forwards; }
+.hopper .r-legs { transform-box:view-box; transform-origin:160px 277px; animation:hop-legs 1.5s ease-in-out forwards; }
+.hopper .r-wing { opacity:0; transform-box:view-box; transform-origin:170px 115px; animation:hop-wing 1.5s linear forwards; }
+@keyframes hop-path {
+  0% { opacity:0; transform:scale(.6); } 6% { opacity:1; transform:none; }
+  10% { transform:none; animation-timing-function:cubic-bezier(.2,.7,.4,1); } 20% { transform:translateY(-30%); animation-timing-function:cubic-bezier(.6,0,.8,.3); } 30% { transform:none; }
+  40% { transform:none; animation-timing-function:cubic-bezier(.2,.7,.4,1); } 50% { transform:translateY(-24%); animation-timing-function:cubic-bezier(.6,0,.8,.3); } 60% { transform:none; }
+  70% { opacity:1; transform:none; animation-timing-function:cubic-bezier(.3,0,.6,1); } 88% { opacity:1; } 100% { opacity:0; transform:translate(90%, -180%) scale(.85); } }
+@keyframes hop-body {
+  0%, 6% { transform:none; } 9% { transform:translateY(5px) scaleY(.92); } 14% { transform:rotate(-7deg); } 26% { transform:rotate(3deg); } 30% { transform:translateY(5px) scaleY(.93); } 34% { transform:none; }
+  39% { transform:translateY(5px) scaleY(.92); } 44% { transform:rotate(-6deg); } 56% { transform:rotate(3deg); } 60% { transform:translateY(5px) scaleY(.93); } 64% { transform:none; }
+  69% { transform:translateY(8px) scaleY(.88); } 75% { transform:rotate(-14deg); } 100% { transform:rotate(-18deg); } }
+@keyframes hop-legs {
+  0%, 6% { transform:none; } 9% { transform:scaleY(.82); } 14% { transform:none; } 18%, 24% { transform:translateY(-14px) scaleY(.75) rotate(14deg); } 30% { transform:scaleY(.85); } 34% { transform:none; }
+  39% { transform:scaleY(.82); } 44% { transform:none; } 48%, 54% { transform:translateY(-14px) scaleY(.75) rotate(14deg); } 60% { transform:scaleY(.85); } 64% { transform:none; }
+  69% { transform:scaleY(.8); } 75% { transform:none; } 80%, 100% { transform:translateY(-30px) scaleY(.6) rotate(30deg); } }
+@keyframes hop-wing {
+  0%, 70% { opacity:0; transform:rotate(60deg) scale(.6); } 73% { opacity:1; transform:rotate(-15deg); }
+  79% { transform:rotate(45deg) scaleY(.75); } 85% { transform:rotate(-20deg); } 91% { transform:rotate(45deg) scaleY(.75); } 97% { transform:rotate(-20deg); } 100% { opacity:1; transform:rotate(10deg); } }
+@media (prefers-reduced-motion: reduce) { .hopper, .hopper * { animation:none !important; } .hopper { transition:opacity .4s; } .hopper.away { opacity:0; } }
 
 /* ---------- Rückgängig ---------- */
 .toast { position:fixed; z-index:30; left:50%; transform:translateX(-50%); bottom:calc(var(--tap) + 24px + env(safe-area-inset-bottom, 0px));

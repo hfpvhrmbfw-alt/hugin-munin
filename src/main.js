@@ -10,6 +10,7 @@ import {
 import * as storage from './storage.js';
 import { createClient, markDirty, syncOnce, subscribe } from './sync.js';
 import { renderShell, on, shareText } from './ui.js';
+import { HOPPER_SVG } from './raven.js';
 import { DEFAULT_LIST_NAME, MSG, IMPORT_ERROR, SYNC, ADDRESS_ERROR, errorText } from './texts.js';
 
 const fmtTime = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -75,15 +76,14 @@ const calm = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
 function hop(row) {
   if (!row) return;
   const r = row.getBoundingClientRect();
-  const el = document.createElement('span');
-  el.className = calm() ? 'mini hop' : 'mini hop still';
-  el.setAttribute('aria-hidden', 'true');
-  el.style.setProperty('--mini', "url('icons/mini-huepft.png')");
-  el.style.left = `${r.right - 112}px`;
-  el.style.top = `${r.top + r.height / 2 - 16}px`;
+  const box = document.createElement('div');
+  box.innerHTML = HOPPER_SVG;
+  const el = box.firstElementChild;
+  el.style.left = `${r.right - 120}px`;
+  el.style.top = `${r.top + r.height / 2 - 24}px`;
   document.body.append(el);
-  setTimeout(() => { if (calm()) el.style.setProperty('--mini', "url('icons/mini-fliegt.png')"); el.classList.add('away'); }, 520);
-  setTimeout(() => el.remove(), 1050);
+  if (!calm()) setTimeout(() => el.classList.add('away'), 500);
+  setTimeout(() => el.remove(), 1600);
 }
 
 /** Kurzes Antippen spürbar machen: Android vibriert, das iPhone (ab iOS 18) klickt über ein Schalter-Feld. */

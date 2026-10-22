@@ -1,8 +1,8 @@
 // Service Worker: App-Hülle offline verfügbar machen. Daten laufen nie über den Cache.
-const VERSION = 'hm-11';
+const VERSION = 'hm-12';
 const SHELL = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
-  'src/main.js', 'src/model.js', 'src/logic.js', 'src/storage.js', 'src/sync.js', 'src/texts.js', 'src/ui.js',
+  'src/main.js', 'src/model.js', 'src/logic.js', 'src/storage.js', 'src/sync.js', 'src/texts.js', 'src/ui.js', 'src/raven.js',
   'icons/favicon.png', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 
   ...['shopping', 'tasks', 'calendar', 'today', 'notes', 'contacts', 'gifts', 'projects', 'search'].flatMap((m) => [`icons/rabe-${m}.png`, `icons/rabe-${m}-rand.png`]),
   ...['sitzt', 'fliegt', 'huepft', 'schlaeft', 'zwei', 'schaut', 'traegt', 'landet'].map((m) => `icons/mini-${m}.png`),
