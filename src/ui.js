@@ -216,7 +216,7 @@ function birthdayLine(state, c, b) {
 
 function listPicker(state, kind, currentId) {
   const lists = alive(state.data.lists).filter((l) => l.kind === kind && !l.archived).sort((a, b) => a.sort - b.sort);
-  const opts = lists.map((l) => `<option value="${l.id}" ${l.id === currentId ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
+  const opts = lists.map((l) => `<option value="${l.id}" ${l.id === currentId ? 'selected' : ''}>${esc(l.name.toLocaleLowerCase('de-DE'))}</option>`).join('');
   return `<div class="listbar">
     <label class="field"><select aria-label="Liste" data-action="pick-list" data-kind="${kind}">${opts}</select></label>
     ${iconBtn('edit', 'Liste umbenennen', `data-action="rename-list" data-id="${currentId}"`)}

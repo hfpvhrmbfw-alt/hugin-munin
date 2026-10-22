@@ -33,7 +33,7 @@ a { color:var(--ink); text-decoration-color:var(--accent); text-decoration-thick
 code { font:14px var(--font-label); background:var(--sunken); padding:2px 6px; border-radius:4px; }
 
 /* Oberflächenwörter klein, Inhalte bleiben, wie sie sind. */
-.apphead h1, .bigtitle, .btn, .tabbar [role="tab"], summary { text-transform:lowercase; }
+.apphead h1, .bigtitle, .listbar select, .search select, .btn, .tabbar [role="tab"], summary { text-transform:lowercase; }
 
 /* ---------- Rahmen: Kopfzeile oben, Tab-Leiste unten ---------- */
 .app { min-height:100dvh; padding-bottom:calc(var(--tap) + 12px + env(safe-area-inset-bottom, 0px) + var(--s6)); }
