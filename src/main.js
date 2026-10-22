@@ -71,6 +71,21 @@ function flash(text) { state.flash = text; render(); setTimeout(() => { if (stat
 const wait = (ms) => new Promise((r) => { setTimeout(r, ms); });
 const calm = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+/** Beim Abhaken hüpft rechts in der Zeile kurz ein kleiner Rabe und fliegt dann davon. */
+function hop(row) {
+  if (!row) return;
+  const r = row.getBoundingClientRect();
+  const el = document.createElement('span');
+  el.className = calm() ? 'mini hop' : 'mini hop still';
+  el.setAttribute('aria-hidden', 'true');
+  el.style.setProperty('--mini', "url('icons/mini-huepft.png')");
+  el.style.left = `${r.right - 112}px`;
+  el.style.top = `${r.top + r.height / 2 - 16}px`;
+  document.body.append(el);
+  setTimeout(() => { if (calm()) el.style.setProperty('--mini', "url('icons/mini-fliegt.png')"); el.classList.add('away'); }, 520);
+  setTimeout(() => el.remove(), 1050);
+}
+
 /** Kurzes Antippen spürbar machen: Android vibriert, das iPhone (ab iOS 18) klickt über ein Schalter-Feld. */
 function haptic() {
   if (navigator.vibrate) { navigator.vibrate(8); return; }
@@ -349,6 +364,7 @@ const actions = {
     haptic();
     // Abgehakte Zeile erst ruhig ausblenden, dann umsortieren.
     const row = el.closest('.item');
+    if (el.checked) hop(row);
     if (el.checked && row && calm()) { row.classList.add('settling'); await wait(420); }
     await changeWithUndo('items', [el.dataset.id], { done: el.checked }, el.checked ? MSG.undoDone : '');
     render();
@@ -679,6 +695,7 @@ root.addEventListener('touchend', async () => {
   const item = state.data.items.find((i) => i.id === id);
   if (!item || !s.armed) return;
   if (s.armed > 0) {
+    if (!item.done) hop(row);
     if (!item.done && calm()) { row.querySelector('input[type="checkbox"]').checked = true; row.classList.add('settling'); await wait(420); }
     await changeWithUndo('items', [id], { done: !item.done }, item.done ? '' : MSG.undoDone);
   } else {
