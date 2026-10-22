@@ -5,7 +5,7 @@ import {
 } from './model.js';
 import {
   splitQuickAdd, itemsOf, serverAddress, addressWarning, guessStorage, fromTemplate, parseAmount, parseDayMonth,
-  shoppingHistory, parseIcs, addDays, alive, guessCategory,
+  shoppingHistory, parseIcs, icsName, addDays, alive, guessCategory,
 } from './logic.js';
 import * as storage from './storage.js';
 import { createClient, markDirty, syncOnce, subscribe } from './sync.js';
@@ -235,7 +235,11 @@ async function refreshFeeds(force = false) {
           ? await fetch(`${s.serverUrl}/api/hm/ics?url=${encodeURIComponent(c.url)}`, { headers: { Authorization: client?.token || s.token } })
           : await fetch(c.url);
         if (!res.ok) throw new Error(String(res.status));
-        next = { url: c.url, at: now(), events: parseIcs(await res.text(), c.id, ZONE, addDays(state.today, -60)), error: '' };
+        const text = await res.text();
+        next = { url: c.url, at: now(), events: parseIcs(text, c.id, ZONE, addDays(state.today, -60)), error: '' };
+        // Ohne eigenen Namen den des Kalenders übernehmen (Apple-Kalender bringen ihn mit), für alle im Haushalt.
+        const name = !c.title && icsName(text);
+        if (name) await update('calendars', c.id, { title: name });
       } catch (err) {
         // Alte Termine behalten, wenn der Kalender gerade nicht erreichbar ist.
         next = { url: c.url, at: now(), events: f?.url === c.url ? f.events : [], error: String(err?.message || err) };

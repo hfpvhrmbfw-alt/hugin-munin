@@ -623,6 +623,15 @@ const plusMinutes = (date, time, minutes) => {
   return { date: isoFromDay(day), time: `${pad(Math.floor(rest / 60))}:${pad(rest % 60)}` };
 };
 
+/** Name, den der Kalender selbst mitbringt (X-WR-CALNAME, z. B. bei Apple- und Google-Kalendern), sonst ''. */
+export function icsName(text) {
+  for (const p of icsProps(text)) {
+    if (p.name === 'BEGIN' && p.value.toUpperCase() !== 'VCALENDAR') return '';
+    if (p.name === 'X-WR-CALNAME') return icsText(p.value).slice(0, 80);
+  }
+  return '';
+}
+
 /**
  * Kalenderdatei (ICS) in Termine im Format der App umwandeln. Unterstützt: ganztägig und mit Uhrzeit,
  * Zeitzonen, Dauer, Wiederholung täglich/wöchentlich (auch an mehreren Wochentagen)/monatlich/jährlich mit

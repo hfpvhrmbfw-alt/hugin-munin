@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseIcs, occurrences, search, shoppingHistory, fold } from '../src/logic.js';
+import { parseIcs, icsName, occurrences, search, shoppingHistory, fold } from '../src/logic.js';
 import { sanitizeItem, sanitizeList, sanitizeNote, sanitizeContact, sanitizeCalendar } from '../src/model.js';
 
 const ics = (...events) => ['BEGIN:VCALENDAR', 'VERSION:2.0', ...events.flatMap((e) => ['BEGIN:VEVENT', ...e, 'END:VEVENT']), 'END:VCALENDAR'].join('\r\n');
@@ -93,4 +93,18 @@ test('Fremder Kalender: webcal wird https, Unsinn wird leer', () => {
   assert.equal(sanitizeCalendar({ id: id('c'), title: 'Ferien', url: 'webcal://example.de/f.ics' }).url, 'https://example.de/f.ics');
   assert.equal(sanitizeCalendar({ id: id('c'), url: 'javascript:alert(1)' }).url, '');
   assert.equal(sanitizeCalendar({ id: 'kurz' }), null);
+});
+
+test('apple-kalender (icloud-freigabe): name, zeitzone, serie', () => {
+  const text = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Apple Inc.//iCloud Calendar Server//EN', 'X-WR-CALNAME:Familie', 'X-APPLE-CALENDAR-COLOR:#34AADC',
+    'BEGIN:VTIMEZONE', 'TZID:Europe/Berlin', 'BEGIN:DAYLIGHT', 'DTSTART:19810329T020000', 'TZNAME:MESZ', 'END:DAYLIGHT', 'END:VTIMEZONE',
+    'BEGIN:VEVENT', 'UID:x@icloud', 'DTSTART;TZID=Europe/Berlin:20261103T170000', 'DTEND;TZID=Europe/Berlin:20261103T180000',
+    'RRULE:FREQ=WEEKLY;BYDAY=TU', 'SUMMARY:Schwimmen', 'X-APPLE-TRAVEL-ADVISORY-BEHAVIOR:AUTOMATIC', 'END:VEVENT', 'END:VCALENDAR',
+  ].join('\r\n');
+  assert.equal(icsName(text), 'Familie');
+  const [e] = parseIcs(text, 'f', 'Europe/Berlin', '2026-01-01');
+  assert.deepEqual([e.title, e.startDate, e.startTime, e.endTime, e.repeat], ['Schwimmen', '2026-11-03', '17:00', '18:00', 'weekly']);
+  assert.equal(icsName(ics(['UID:a', 'X-WR-CALNAME:Falsch', 'DTSTART:20261103'])), '');
+  assert.equal(sanitizeCalendar({ id: 'abcdefghijklmno', url: 'webcal://p52-caldav.icloud.com/published/2/MTIz' }).url, 'https://p52-caldav.icloud.com/published/2/MTIz');
 });

@@ -142,6 +142,19 @@ export const MSG = {
   feedsLocal: 'Ohne eigenen Server lassen sich viele Kalender nicht laden, weil der Browser fremde Seiten nicht abrufen darf.',
   feedError: 'nicht erreichbar',
   feedLoaded: (n) => (n === 1 ? '1 termin' : `${n} termine`),
+  appleIntro: 'Ein Kalender aus der Apple-Kalender-App (iCloud) lässt sich als öffentlicher Link freigeben und hier eintragen. Der Name kann leer bleiben, er wird dann aus dem Kalender übernommen.',
+  appleIphone: [
+    'Kalender-App öffnen, unten auf „Kalender“ tippen.',
+    'Beim gewünschten iCloud-Kalender auf das (i) tippen.',
+    'Ganz unten „Öffentlicher Kalender“ einschalten.',
+    '„Link teilen …“ → „Kopieren“ und hier bei „adresse“ einfügen.',
+  ],
+  appleMac: [
+    'Kalender-App öffnen, links mit der rechten Maustaste auf den iCloud-Kalender klicken.',
+    '„Kalender teilen …“ wählen und „Öffentlicher Kalender“ anhaken.',
+    'Den Link (webcal://…) kopieren und hier einfügen.',
+  ],
+  appleNote: 'Wer den Link kennt, kann die Termine lesen, also nur in Hugin & Munin eintragen. Änderungen im Apple-Kalender erscheinen hier nach spätestens einer halben Stunde, Termine daraus sind nur zum Ansehen. Kalender „Auf meinem iPhone/Mac“ ohne iCloud lassen sich nicht freigeben.',
   badFeedUrl: 'Bitte die Adresse des Kalenders eintragen (https://… oder webcal://…).',
   // Erinnerungen
   pushHint: 'Morgens um 7:30 ein Überblick über den Tag, 30 Minuten vor Terminen eine Erinnerung.',

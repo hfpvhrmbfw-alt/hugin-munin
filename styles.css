@@ -155,6 +155,10 @@ summary::after { content:"+"; font:300 22px/1 var(--font-body); color:var(--acce
 details[open] summary::after { content:"−"; }
 summary:hover { color:var(--ink); }
 details > div { padding:0 0 var(--s3); }
+.howto { margin:var(--s2) 0; }
+.howto .small { font-size:14px; line-height:1.45; color:var(--ink); }
+.howto p { margin:0 0 var(--s2); }
+.howto ol { margin:0 0 var(--s3); padding-left:1.3em; }
 
 .editor { display:grid; gap:var(--s3); padding:var(--s2) 0 var(--s4); }
 .editor .pair { display:grid; grid-template-columns:1fr 1fr; gap:var(--s3); }

@@ -447,8 +447,13 @@ function feedSection(state) {
   return `<details${state.editing === 'feeds' ? ' open' : ''}><summary>fremde kalender${cals.length ? ` (${cals.length})` : ''}</summary><div>
     <p class="empty small">${esc(MSG.feedsHint)}${state.session ? '' : ` ${esc(MSG.feedsLocal)}`}</p>
     ${rows}
+    <details class="howto"><summary>apple-kalender einblenden</summary><div class="small">
+      <p>${esc(MSG.appleIntro)}</p>
+      <p class="cap">iphone</p><ol>${MSG.appleIphone.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>
+      <p class="cap">mac</p><ol>${MSG.appleMac.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>
+      <p class="empty">${esc(MSG.appleNote)}</p></div></details>
     <form class="editor" data-form="add-calendar">
-      <div class="pair"><label class="field"><span class="cap">name</span><input name="title" placeholder="Schulferien" required></label>
+      <div class="pair"><label class="field"><span class="cap">name</span><input name="title" placeholder="optional"></label>
         <label class="field"><span class="cap">adresse</span><input name="url" autocomplete="off" autocapitalize="none" placeholder="webcal://…" required></label></div>
       <div class="actions"><button class="btn primary" type="submit">Hinzufügen</button>
         ${cals.length ? '<button class="btn" type="button" data-action="reload-feeds">Neu laden</button>' : ''}</div></form></div></details>`;
