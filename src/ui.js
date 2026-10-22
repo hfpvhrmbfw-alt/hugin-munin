@@ -417,7 +417,8 @@ function renderCalendar(state) {
   <div class="month"><div class="wdays" aria-hidden="true">${['mo', 'di', 'mi', 'do', 'fr', 'sa', 'so'].map((x) => `<span>${x}</span>`).join('')}</div><div class="mgrid">${cells}</div></div>
   <section class="section">${dayHead(pick, state.today)}${sel ? sel.events.map(eventRow).join('') : `<p class="empty small">${esc(MSG.noEventsDay)}</p>`}</section>
   ${eventForm(state, editing || null, pick)}
-  ${feedSection(state)}`;
+  ${feedSection(state)}
+  ${aboSection(state)}`;
   }
   const from = addDays(state.today, state.calOffset * 28);
   const to = addDays(from, 27);
@@ -432,7 +433,29 @@ function renderCalendar(state) {
   ${views}
   ${eventForm(state, editing || null)}
   <section class="section">${list || emptyState('calendar', MSG.noEvents)}</section>
-  ${feedSection(state)}`;
+  ${feedSection(state)}
+  ${aboSection(state)}`;
+}
+
+/** Adresse des Kalender-Abos (Termine des Haushalts für den Apple-Kalender), '' wenn aus. */
+export const aboUrl = (state) => (state.session?.household && state.feedLink ? `${state.session.serverUrl}/api/hm/feed/${state.feedLink}.ics` : '');
+
+/** Eigene Termine im Apple-Kalender: geheimen Link anlegen, kopieren, erneuern, abschalten. */
+function aboSection(state) {
+  const s = state.session;
+  const steps = (title, list) => `<p class="cap">${title}</p><ol>${list.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>`;
+  let body;
+  if (!s?.household) body = `<p class="empty small">${esc(MSG.aboLocal)}</p>`;
+  else if (state.feedLink === null) body = `<p class="empty small">${esc(MSG.aboOldServer)}</p>`;
+  else if (!state.feedLink) body = `<p class="empty small">${esc(MSG.aboHint)}</p>
+    <div class="actions"><button class="btn primary" type="button" data-action="abo-on">Link erstellen</button></div>`;
+  else body = `<p class="empty small">${esc(MSG.aboHint)}</p>
+    <div class="item"><span class="t"><span>link zum abonnieren</span><b><code class="invite">${esc(aboUrl(state))}</code></b></span>
+      <button class="btn small" type="button" data-action="abo-copy">Kopieren</button></div>
+    <div class="howto small">${steps('iphone', MSG.aboIphone)}${steps('mac', MSG.aboMac)}<p class="empty">${esc(MSG.aboNote)}</p></div>
+    <div class="actions"><button class="btn" type="button" data-action="abo-renew">Neuer Link</button>
+      <button class="btn quiet" type="button" data-action="abo-off">Abschalten</button></div>`;
+  return `<details${state.editing === 'abo' ? ' open' : ''}><summary>im apple-kalender anzeigen</summary><div>${body}</div></details>`;
 }
 
 /** Fremde Kalender: Liste mit Stand und Formular zum Hinzufügen. */

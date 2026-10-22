@@ -9,7 +9,7 @@ import {
 } from './logic.js';
 import * as storage from './storage.js';
 import { createClient, markDirty, syncOnce, subscribe } from './sync.js';
-import { renderShell, on, shareText } from './ui.js';
+import { renderShell, on, shareText, aboUrl } from './ui.js';
 import { HOPPER_SVG } from './raven.js';
 import { DEFAULT_LIST_NAME, MSG, IMPORT_ERROR, SYNC, ADDRESS_ERROR, errorText } from './texts.js';
 
@@ -33,6 +33,7 @@ const state = {
   undo: null, // { text, changes:[{collection, id, fields}] } für „rückgängig“
   query: '', prevTab: 'today',
   feeds: {}, // fremde Kalender: { [calendarId]: { url, at, events, error } }
+  feedLink: '', // Kalender-Abo: geheimer Schlüssel, '' = aus, null = Server kennt es nicht
   push: '', // Erinnerungen auf diesem Gerät, siehe pushSection in ui.js
   lastExport: '',
   installHint: '', // 'ios' | 'prompt' | '' : Hinweis „auf den Home-Bildschirm“
@@ -252,6 +253,13 @@ async function refreshFeeds(force = false) {
   } finally { feedsLoading = false; }
 }
 
+/** Link des Kalender-Abos anlegen, erneuern oder abschalten (fn liefert den neuen Schlüssel). */
+async function aboChange(fn) {
+  state.editing = 'abo';
+  try { state.feedLink = await fn(); } catch { alert(MSG.aboFailed); }
+  render();
+}
+
 // ---- Erinnerungen (Web Push) -----------------------------------------------------------
 
 const b64urlBytes = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4)), (c) => c.charCodeAt(0));
@@ -354,6 +362,8 @@ async function connect() {
     for (const g of state.data.gifts.filter((x) => x.private && !x.owner)) await update('gifts', g.id, { owner: s.user.id });
     if (s.household) {
       state.members = (await client.members()).filter((m) => m.household === s.household.id);
+      // Kalender-Abo: null, wenn der Server es noch nicht kennt (ältere Mac-App).
+      state.feedLink = await client.feedToken(s.household.id).catch(() => null);
       unsubscribe(); unsubscribe = subscribe(client, () => scheduleSync(300));
       scheduleSync(0);
     }
@@ -404,6 +414,10 @@ const actions = {
     const target = root.querySelector(`[data-id="${id}"]`);
     if (target) target.scrollIntoView({ block: 'center' }); else scrollTo(0, 0);
   },
+  'abo-on': () => aboChange(() => client.newFeedToken(state.session.household.id)),
+  'abo-renew': () => confirm(MSG.aboRenewAsk) && aboChange(() => client.newFeedToken(state.session.household.id)),
+  'abo-off': () => confirm(MSG.aboOffAsk) && aboChange(async () => { await client.feedOff(state.session.household.id); return ''; }),
+  'abo-copy': async () => { try { await navigator.clipboard.writeText(aboUrl(state)); flash(MSG.aboCopied); } catch { /* Kopieren nicht erlaubt */ } },
   'reload-feeds': () => { state.editing = 'feeds'; refreshFeeds(true); },
   'push-on': () => pushOn(),
   'push-off': () => pushOff(),

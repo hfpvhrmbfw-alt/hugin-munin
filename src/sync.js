@@ -40,6 +40,9 @@ export function createClient(baseUrl, fetchFn = fetch) {
     createHousehold: (fields) => request('POST', '/api/collections/households/records', fields),
     join: (code) => request('POST', '/api/hm/join', { code }),
     members: () => request('GET', '/api/hm/members'),
+    feedToken: async (household) => (await request('GET', `/api/hm/feed-token?household=${encodeURIComponent(household)}`)).token,
+    newFeedToken: async (household) => (await request('POST', '/api/hm/feed-token', { household })).token,
+    feedOff: (household) => request('DELETE', `/api/hm/feed-token?household=${encodeURIComponent(household)}`),
   };
 }
 
