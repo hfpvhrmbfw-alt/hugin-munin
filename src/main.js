@@ -715,7 +715,15 @@ async function start() {
   state.setup = (await store.getMeta('setupPending')) === true;
   await ensureLists();
   render();
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    // Neue Version: sobald der neue Service Worker übernimmt, einmal neu laden. Beim Zurückkehren nach Updates schauen.
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+    }).catch(() => {});
+  }
   if (state.session) await connect();
   refreshFeeds();
 }
