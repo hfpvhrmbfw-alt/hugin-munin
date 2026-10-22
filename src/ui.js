@@ -47,7 +47,10 @@ export function who(state, id) {
 }
 
 /** Leere Seite mit Rabe. */
-const emptyState = (motif, text) => `<div class="empty-state"><span class="raven" style="--raven:url('icons/${RAVEN[motif] || RAVEN.today}')" aria-hidden="true"></span><p>${esc(text)}</p></div>`;
+const emptyState = (motif, text) => {
+  const img = RAVEN[motif] || RAVEN.today;
+  return `<div class="empty-state"><span class="raven" style="--raven:url('icons/${img}');--raven-rand:url('icons/${img.replace('.png', '-rand.png')}')" aria-hidden="true"></span><p>${esc(text)}</p></div>`;
+};
 
 /** Alle Termine: eigene und die aus fremden Kalendern (nur die von noch eingetragenen Kalendern). */
 function allEvents(state) {
