@@ -21,7 +21,7 @@ jobs:
           node-version: 22
       - name: Server prüfen
         working-directory: mac/server
-        run: go vet ./...
+        run: go vet ./... && go test ./...
       - name: App bauen
         run: VERSION="0.1.${{ github.run_number }}" sh mac/build-app.sh
       - name: Abgleich gegen den gebauten Server testen

@@ -2,35 +2,49 @@
 
 export const APP_NAME = 'Hugin & Munin';
 
+/** Bild für leere Seiten je Motiv (Raben-Zeichnungen von Anna), liegt in icons/. */
+export const RAVEN = {
+  shopping: 'rabe-shopping.png', tasks: 'rabe-tasks.png', calendar: 'rabe-calendar.png', today: 'rabe-today.png', notes: 'rabe-notes.png',
+  contacts: 'rabe-contacts.png', gifts: 'rabe-gifts.png', projects: 'rabe-projects.png', search: 'rabe-search.png',
+};
+
+// Oberflächenwörter klein (Castra · Blei), Sätze normal.
 export const TABS = {
-  today: 'Heute', shopping: 'Einkauf', tasks: 'Aufgaben', calendar: 'Kalender', meals: 'Essen', chores: 'Haushalt',
-  expenses: 'Ausgaben', projects: 'Projekte', notes: 'Notizen', contacts: 'Kontakte', gifts: 'Geschenke', templates: 'Vorlagen', more: 'Mehr',
+  today: 'heute', shopping: 'einkauf', tasks: 'aufgaben', calendar: 'kalender', meals: 'essen', chores: 'haushalt',
+  expenses: 'ausgaben', projects: 'projekte', notes: 'notizen', contacts: 'kontakte', gifts: 'geschenke', templates: 'vorlagen', more: 'mehr',
+  search: 'suche',
+};
+
+/** Bereiche in der Suche. */
+export const AREA = {
+  shopping: 'einkauf', tasks: 'aufgaben', project: 'projekte', calendar: 'kalender', notes: 'notizen', contacts: 'kontakte',
+  gifts: 'geschenke', meals: 'essen', expenses: 'ausgaben', chores: 'haushalt',
 };
 
 /** Module in den Einstellungen: Name und ein Satz, was es kann. */
 export const MODULE = {
-  shopping: ['Einkauf', 'Einkaufslisten, nach Bereich im Laden sortiert.'],
-  tasks: ['Aufgaben', 'Aufgabenlisten mit Fälligkeit, „wichtig“ und Zuständigkeit.'],
-  calendar: ['Kalender', 'Gemeinsame Termine, auch wiederkehrend.'],
-  meals: ['Essensplan', 'Was es in dieser Woche zu essen gibt.'],
-  chores: ['Haushaltsplan', 'Wiederkehrende Hausarbeit, ihr seid abwechselnd dran.'],
-  expenses: ['Ausgaben', 'Gemeinsame Ausgaben und wer wem wie viel schuldet.'],
-  projects: ['Projekte', 'Größere Vorhaben mit Schritten und Fortschritt.'],
-  notes: ['Notizen', 'Gemeinsame Notizen, z. B. WLAN, Maße, Ideen.'],
-  board: ['Pinnwand', 'Kurze Nachrichten oben auf „Heute“.'],
-  contacts: ['Kontakte & Geburtstage', 'Adressen, Nummern, Geburtstage mit Erinnerung auf „Heute“.'],
-  gifts: ['Geschenkideen', 'Ideen sammeln, auf Wunsch nur für dich sichtbar.'],
-  templates: ['Listen-Vorlagen', 'Wiederkehrende Listen wie Wocheneinkauf oder Packliste.'],
+  shopping: ['einkauf', 'Einkaufslisten, nach Bereich im Laden sortiert.'],
+  tasks: ['aufgaben', 'Aufgabenlisten mit Fälligkeit, „wichtig“ und Zuständigkeit.'],
+  calendar: ['kalender', 'Gemeinsame Termine, auch wiederkehrend, dazu fremde Kalender wie Schulferien.'],
+  meals: ['essensplan', 'Was es in dieser Woche zu essen gibt.'],
+  chores: ['haushaltsplan', 'Wiederkehrende Hausarbeit, ihr seid abwechselnd dran.'],
+  expenses: ['ausgaben', 'Gemeinsame Ausgaben und wer wem wie viel schuldet.'],
+  projects: ['projekte', 'Größere Vorhaben mit Schritten und Fortschritt.'],
+  notes: ['notizen', 'Gemeinsame Notizen, z. B. WLAN, Maße, Ideen.'],
+  board: ['pinnwand', 'Kurze Nachrichten oben auf „Heute“.'],
+  contacts: ['kontakte & geburtstage', 'Adressen, Nummern, Geburtstage mit Erinnerung auf „Heute“.'],
+  gifts: ['geschenkideen', 'Ideen sammeln, auf Wunsch nur für dich sichtbar.'],
+  templates: ['listen-vorlagen', 'Wiederkehrende Listen wie Wocheneinkauf oder Packliste.'],
 };
 
 /** Speicherorte: Name und Hinweis. */
 export const STORAGE = {
-  local: ['Nur auf diesem Gerät', 'Kein Server, kein Konto. Teilen mit dem Partner geht dann nicht, eine Sicherung als Datei schon.'],
-  tailscale: ['Eigener Server über Tailscale', 'Der Mac mini zu Hause, von überall erreichbar über die Tailscale-App. Empfohlen.'],
-  wireguard: ['Eigener Server über WireGuard', 'Der Mac mini über einen eigenen WireGuard-Tunnel (z. B. von der FritzBox). Die WireGuard-App muss an sein.'],
-  lan: ['Eigener Server im Heimnetz', 'Nur im WLAN zu Hause erreichbar. Unterwegs speichert die App und gleicht später ab.'],
-  domain: ['Eigener Server mit eigener Adresse', 'Der Mac mini unter einer eigenen Domain mit HTTPS, z. B. über Cloudflare Tunnel.'],
-  hosted: ['Gemieteter Server', 'PocketBase bei einem Anbieter (z. B. PocketHost). Die Daten liegen dann nicht bei euch zu Hause.'],
+  local: ['nur auf diesem gerät', 'Kein Server, kein Konto. Teilen mit dem Partner geht dann nicht, eine Sicherung als Datei schon.'],
+  tailscale: ['eigener server über tailscale', 'Der Mac mini zu Hause, von überall erreichbar über die Tailscale-App. Empfohlen.'],
+  wireguard: ['eigener server über wireguard', 'Der Mac mini über einen eigenen WireGuard-Tunnel (z. B. von der FritzBox). Die WireGuard-App muss an sein.'],
+  lan: ['eigener server im heimnetz', 'Nur im WLAN zu Hause erreichbar. Unterwegs speichert die App und gleicht später ab.'],
+  domain: ['eigener server mit eigener adresse', 'Der Mac mini unter einer eigenen Domain mit HTTPS, z. B. über Cloudflare Tunnel.'],
+  hosted: ['gemieteter server', 'PocketBase bei einem Anbieter (z. B. PocketHost). Die Daten liegen dann nicht bei euch zu Hause.'],
 };
 
 export const ADDRESS_ERROR = {
@@ -42,18 +56,18 @@ export const ADDRESS_ERROR = {
 };
 
 export const MEAL_SLOT = { breakfast: 'frühstück', lunch: 'mittag', dinner: 'abend' };
-export const CHORE_UNIT = { daily: 'Tage', weekly: 'Wochen', monthly: 'Monate' };
+export const CHORE_UNIT = { daily: 'tage', weekly: 'wochen', monthly: 'monate' };
 export const GIFT_STATUS = { idea: 'idee', bought: 'gekauft', given: 'verschenkt' };
 
 export const CATEGORY = {
-  produce: 'Obst & Gemüse', bakery: 'Brot & Backwaren', dairy: 'Milch & Käse', meat: 'Fleisch & Fisch',
-  frozen: 'Tiefkühl', pantry: 'Vorrat', drinks: 'Getränke', household: 'Haushalt', care: 'Pflege', other: 'Sonstiges',
+  produce: 'obst & gemüse', bakery: 'brot & backwaren', dairy: 'milch & käse', meat: 'fleisch & fisch',
+  frozen: 'tiefkühl', pantry: 'vorrat', drinks: 'getränke', household: 'haushalt', care: 'pflege', other: 'sonstiges',
 };
 
 export const REPEAT = { none: 'einmalig', daily: 'täglich', weekly: 'wöchentlich', monthly: 'monatlich', yearly: 'jährlich' };
-export const REPEAT_EVERY = { daily: 'Tage', weekly: 'Wochen', monthly: 'Monate', yearly: 'Jahre' };
+export const REPEAT_EVERY = { daily: 'tage', weekly: 'wochen', monthly: 'monate', yearly: 'jahre' };
 
-export const KIND = { shopping: 'Einkaufsliste', tasks: 'Aufgabenliste', project: 'Projekt', template: 'Vorlage' };
+export const KIND = { shopping: 'einkaufsliste', tasks: 'aufgabenliste', project: 'projekt', template: 'vorlage' };
 
 export const THEME = { system: 'wie das Gerät', light: 'hell', dark: 'dunkel' };
 
@@ -78,8 +92,6 @@ export const SYNC = {
 export const MSG = {
   confirmImport: (n) => `${n} Einträge aus der Sicherung übernehmen? Gleiche Einträge werden überschrieben.`,
   imported: (n, skipped) => `${n} Einträge übernommen${skipped ? `, ${skipped} fehlerhafte übersprungen` : ''}.`,
-  confirmDeleteEvent: 'Diesen Termin (bei Wiederholung die ganze Serie) löschen?',
-  confirmClearDone: 'Alle erledigten Einträge dieser Liste entfernen?',
   confirmLogout: 'Abmelden? Die Daten bleiben auf diesem Gerät.',
   confirmJoin: 'Beitreten? Deine bisherigen Einträge wandern in den neuen Haushalt.',
   loginFailed: 'Anmeldung fehlgeschlagen. E-Mail oder Passwort stimmen nicht.',
@@ -107,7 +119,36 @@ export const MSG = {
   nothingToday: 'Heute steht nichts an.',
   nothingWeek: 'Die Woche ist frei.',
   emptyList: 'Noch nichts auf der Liste.',
+  allDone: 'Alles erledigt. Zeit für eine Pause.',
   noEvents: 'Keine Termine in den nächsten vier Wochen.',
+  // Rückgängig
+  undoDone: 'abgehakt', undoDeleted: 'gelöscht', undoUnpinned: 'abgenommen',
+  undoCleared: (n) => (n === 1 ? '1 eintrag entfernt' : `${n} einträge entfernt`),
+  // Suche
+  searchHint: 'Sucht in Listen, Terminen, Notizen, Kontakten und mehr.',
+  noResults: 'Nichts gefunden.',
+  // Teilen
+  listCopied: 'Liste kopiert.',
+  // Fremde Kalender
+  feedsHint: 'Kalender-Abos (ICS), z. B. Schulferien, Müllabfuhr oder der Arbeitskalender. Die Adresse endet meist auf .ics oder beginnt mit webcal://. Termine daraus sind nur zum Ansehen.',
+  feedsLocal: 'Ohne eigenen Server lassen sich viele Kalender nicht laden, weil der Browser fremde Seiten nicht abrufen darf.',
+  feedError: 'nicht erreichbar',
+  feedLoaded: (n) => (n === 1 ? '1 termin' : `${n} termine`),
+  badFeedUrl: 'Bitte die Adresse des Kalenders eintragen (https://… oder webcal://…).',
+  // Erinnerungen
+  pushHint: 'Morgens um 7:30 ein Überblick über den Tag, 30 Minuten vor Terminen eine Erinnerung.',
+  pushLocal: 'Erinnerungen kommen vom eigenen Server. Mit „nur auf diesem Gerät“ gibt es keine.',
+  pushNoServer: 'Der Server verschickt keine Erinnerungen. Das kann nur die Mac-App „Hugin & Munin“ (siehe Anleitung Mac-App).',
+  pushUnsupported: 'Dieser Browser kann keine Erinnerungen empfangen. Auf dem iPhone: erst „Zum Home-Bildschirm“ hinzufügen und die App von dort öffnen.',
+  pushDenied: 'Mitteilungen sind für diese App ausgeschaltet. Einschalten in den Einstellungen des Geräts unter Mitteilungen.',
+  pushOn: 'Erinnerungen sind auf diesem Gerät an.',
+  pushOff: 'Erinnerungen sind auf diesem Gerät aus.',
+  pushTestSent: 'Testnachricht ist unterwegs.',
+  pushFailed: 'Das hat nicht geklappt. Ist der Server erreichbar?',
+  // Sicherung
+  backupServer: 'Der Server sichert zusätzlich jede Nacht um 3 Uhr (die letzten 14 Tage).',
+  lastBackup: (d) => `Zuletzt gesichert: ${d}.`,
+  noBackupYet: 'Auf diesem Gerät noch nie gesichert.',
 };
 
 /** Fehlermeldung zu einem Abgleich- oder Server-Fehler. */

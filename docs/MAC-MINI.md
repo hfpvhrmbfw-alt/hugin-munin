@@ -75,8 +75,10 @@ Danach in der PocketBase-Verwaltung (`https://macmini.<name>.ts.net/_/`) bei der
 
 ## 6. Sicherung
 
-- PocketBase-Verwaltung → Settings → Backups: automatische Sicherung einschalten (z. B. täglich um 3 Uhr, die letzten 7 behalten). Die Dateien liegen in `~/hugin-munin-server/pb_data/backups` und werden von Time Machine mitgesichert.
+- Der Server sichert ab Version 3 von selbst jede Nacht um 3 Uhr und behält die letzten 14 (PocketBase-Verwaltung → Settings → Backups, dort änderbar). Die Dateien liegen in `~/hugin-munin-server/pb_data/backups` und werden von Time Machine mitgesichert.
 - Zusätzlich ab und zu in der App unter **Mehr → Sicherung speichern**.
+
+Erinnerungen (Push) verschickt nur die [Mac-App](MAC-APP.md). Mit dieser Terminal-Einrichtung gibt es keine.
 
 ## 7. Aktualisieren
 

@@ -4,9 +4,10 @@ import { SHOPPING_CATEGORIES, REPEATS, MODULES, STORAGE_MODES, MEAL_SLOTS, CHORE
 import {
   groupShopping, sortTasks, itemsOf, overview, agenda, addDays, alive, tabLayout, addressFields, choreState, balances,
   settleUp, monthTotal, upcomingBirthdays, nextBirthday, mealWeek, pinnedNotes, visibleGifts, progress, weekStart,
+  shoppingHistory, search,
 } from './logic.js';
 import {
-  APP_NAME, TABS, CATEGORY, REPEAT, REPEAT_EVERY, THEME, SYNC, MSG, MODULE, STORAGE, MEAL_SLOT, CHORE_UNIT, GIFT_STATUS,
+  APP_NAME, TABS, CATEGORY, REPEAT, REPEAT_EVERY, THEME, SYNC, MSG, MODULE, STORAGE, MEAL_SLOT, CHORE_UNIT, GIFT_STATUS, AREA, RAVEN,
 } from './texts.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -31,6 +32,29 @@ export function dayLabel(iso, today, long = false) {
 }
 
 const memberName = (state, id) => state.members.find((m) => m.id === id)?.name || '';
+
+/**
+ * Kleines Zeichen für eine Person: Anfangsbuchstabe in ihrer Farbe. Die Farbe folgt der Reihenfolge der IDs,
+ * damit sie auf allen Geräten gleich ist. Nur, wenn mehr als eine Person im Haushalt ist.
+ */
+export function who(state, id) {
+  if (!id || state.members.length < 2) return '';
+  const ids = state.members.map((m) => m.id).sort();
+  const i = ids.indexOf(id);
+  if (i < 0) return '';
+  const name = memberName(state, id) || '?';
+  return `<span class="who p${i % 4}" title="${attr(name)}" aria-label="${attr(name)}">${esc(name.trim().charAt(0).toLowerCase() || '?')}</span>`;
+}
+
+/** Leere Seite mit Rabe. */
+const emptyState = (motif, text) => `<div class="empty-state"><span class="raven" style="--raven:url('icons/${RAVEN[motif] || RAVEN.today}')" aria-hidden="true"></span><p>${esc(text)}</p></div>`;
+
+/** Alle Termine: eigene und die aus fremden Kalendern (nur die von noch eingetragenen Kalendern). */
+function allEvents(state) {
+  const cals = new Map(alive(state.data.calendars || []).map((c) => [c.id, c]));
+  const feeds = Object.entries(state.feeds || {}).filter(([id]) => cals.has(id)).flatMap(([, f]) => f.events || []);
+  return feeds.length ? state.data.events.concat(feeds) : state.data.events;
+}
 /** Ist ein Modul eingeschaltet? */
 export const on = (state, module) => state.settings.modules.includes(module);
 
@@ -57,6 +81,8 @@ const ICON = {
   contacts: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/>',
   gifts: '<rect x="4" y="9" width="16" height="11" rx="1.5"/><path d="M3 9h18M12 9v11M12 9c-2-4-6-4-6-1.5S12 9 12 9zM12 9c2-4 6-4 6-1.5S12 9 12 9z"/>',
   templates: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>',
+  share: '<path d="M12 15V3.5M8 7.5l4-4 4 4"/><path d="M8.5 11H6.5A1.5 1.5 0 0 0 5 12.5v6A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5v-6a1.5 1.5 0 0 0-1.5-1.5h-2"/>',
 };
 const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name]}</svg>`;
 const iconBtn = (name, label, data) => `<button class="iconbtn" type="button" aria-label="${attr(label)}" title="${attr(label)}" ${data}>${icon(name)}</button>`;
@@ -65,14 +91,15 @@ const iconBtn = (name, label, data) => `<button class="iconbtn" type="button" ar
 
 /** Tab, der wirklich gezeigt wird: ausgeschaltete Module fallen auf "Heute" zurück. */
 export function currentTab(state) {
-  return state.tab === 'today' || state.tab === 'more' || on(state, state.tab) ? state.tab : 'today';
+  return ['today', 'more', 'search'].includes(state.tab) || on(state, state.tab) ? state.tab : 'today';
 }
 
 export function renderShell(state) {
   if (state.setup) return renderSetup(state);
+  state.events = allEvents(state); // einmal je Zeichnen, für Heute und Kalender
   const tab = currentTab(state);
   const layout = tabLayout(state.settings.modules);
-  const selected = layout.bar.includes(tab) ? tab : 'more';
+  const selected = tab === 'search' ? '' : layout.bar.includes(tab) ? tab : 'more';
   const tabs = layout.bar.map((id) =>
     `<button role="tab" type="button" data-action="tab" data-tab="${id}" aria-selected="${selected === id}" tabindex="${selected === id ? 0 : -1}">${icon(id)}${TABS[id]}</button>`).join('');
   const s = state.sync;
@@ -80,8 +107,10 @@ export function renderShell(state) {
     : s.status === 'ok' ? `${SYNC.ok} ${fmtTime.format(new Date(s.at))}` : (s.message || SYNC[s.status] || '');
   return `<div class="app">
   <header class="apphead"><div class="wrap"><h1>${esc(APP_NAME)}</h1>
-    <span class="sync cap" data-status="${attr(state.session ? s.status : 'local')}" role="status">${esc(syncText)}</span></div></header>
+    <span class="sync cap" data-status="${attr(state.session ? s.status : 'local')}" role="status">${esc(syncText)}</span>
+    ${iconBtn('search', 'Suche', `data-action="tab" data-tab="search"${tab === 'search' ? ' aria-current="page"' : ''}`)}</div></header>
   <main class="wrap" id="main">${flashNote(state)}${renderTab(state, tab)}</main>
+  ${state.undo ? `<div class="toast" role="status"><span>${esc(state.undo.text)}</span><button class="btn small" type="button" data-action="undo">rückgängig</button></div>` : ''}
   <nav class="tabbar" aria-label="Bereiche"><div class="wrap" role="tablist">${tabs}</div></nav></div>`;
 }
 
@@ -101,6 +130,7 @@ function renderTab(state, tab) {
     case 'gifts': return renderGifts(state);
     case 'templates': return renderTemplates(state);
     case 'more': return renderMore(state);
+    case 'search': return renderSearch(state);
     default: return renderToday(state);
   }
 }
@@ -108,14 +138,17 @@ function renderTab(state, tab) {
 // ---- Zeilen ------------------------------------------------------------------
 
 function eventParts(state, occ, today) {
-  const ev = state.data.events.find((e) => e.id === occ.eventId);
+  const ev = (state.events || state.data.events).find((e) => e.id === occ.eventId);
   const multi = occ.start !== occ.end;
+  const cal = ev.feed ? state.data.calendars.find((c) => c.id === ev.feed) : null;
   const sub = [
     !ev.startTime ? 'ganztägig' : ev.endTime ? `bis ${ev.endTime}` : '',
     multi ? `${dayLabel(occ.start, today)} bis ${dayLabel(occ.end, today)}` : '',
-    ev.people.map((p) => memberName(state, p)).filter(Boolean).join(', '),
-  ].filter(Boolean).join(' · ');
-  return { ev, inner: `<span class="t"><b>${esc(ev.title || 'Termin')}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</span><span class="n">${esc(ev.startTime || '')}</span>` };
+    ev.feed ? ev.notes || '' : '',
+  ].filter(Boolean).map(esc).join(sep);
+  const people = ev.people.map((p) => who(state, p) || esc(memberName(state, p))).filter(Boolean).join('');
+  const tag = cal ? `<span class="tag">${esc(cal.title || 'kalender')}</span>` : '';
+  return { ev, inner: `<span class="t"><b>${esc(ev.title || 'Termin')}</b>${sub || tag ? `<span>${sub}${tag}</span>` : ''}</span>${people}<span class="n">${esc(ev.startTime || '')}</span>` };
 }
 
 function eventLine(state, occ, today, current = false) {
@@ -127,16 +160,17 @@ function taskTags(state, item, today, showDue) {
   return [
     item.dueDate && (showDue || overdue) ? `<span class="tag${overdue ? ' acc' : ''}">${esc(dayLabel(item.dueDate, today))}</span>` : '',
     item.important ? '<span class="tag inv">wichtig</span>' : '',
-    item.assignee ? `<span class="tag">${esc(memberName(state, item.assignee))}</span>` : '',
+    item.assignee && !who(state, item.assignee) ? `<span class="tag">${esc(memberName(state, item.assignee))}</span>` : '',
   ].join('');
 }
 
+/** Zeile zum Abhaken. Nach rechts wischen hakt ab, nach links löscht. */
 function checkLine(item, title, sub, extra = '') {
-  return `<div class="item"><label class="check"><input type="checkbox" data-action="toggle" data-id="${item.id}" ${item.done ? 'checked' : ''}>
+  return `<div class="item" data-swipe data-id="${item.id}"><label class="check"><input type="checkbox" data-action="toggle" data-id="${item.id}" ${item.done ? 'checked' : ''}>
     <span class="t"><b>${title}</b>${sub ? `<span>${sub}</span>` : ''}</span></label>${extra}</div>`;
 }
 
-const taskLine = (state, item, today) => checkLine(item, esc(item.title), taskTags(state, item, today, false));
+const taskLine = (state, item, today) => checkLine(item, esc(item.title), taskTags(state, item, today, false), who(state, item.assignee));
 
 // ---- Heute -----------------------------------------------------------------
 
@@ -151,12 +185,12 @@ function visibleData(state) {
 }
 
 function renderToday(state) {
-  const o = overview(visibleData(state), state.today);
+  const o = overview({ ...visibleData(state), events: on(state, 'calendar') ? state.events : [] }, state.today);
   const byId = new Map(state.data.items.map((i) => [i.id, i]));
   const plan = o.todayPlan;
   // Fokus: der nächste Termin, der heute noch nicht vorbei ist
   const now = state.now || '';
-  const evOf = (occ) => state.data.events.find((e) => e.id === occ.eventId);
+  const evOf = (occ) => state.events.find((e) => e.id === occ.eventId);
   const next = plan ? plan.events.find((occ) => { const ev = evOf(occ); return ev.startTime && (ev.endTime || ev.startTime) >= now; }) : null;
   const todayRows = plan ? plan.events.map((e) => eventLine(state, e, state.today, e === next)).join('') + plan.tasks.map((id) => taskLine(state, byId.get(id), state.today)).join('') : '';
   const week = o.week.map((d) => `<div class="day">${group(dayLabel(d.date, state.today, true))}
@@ -169,19 +203,19 @@ function renderToday(state) {
   const hasPlan = on(state, 'calendar') || on(state, 'tasks');
   const extras = todayMeals(state) + todayChores(state);
   return `
-  <h1 class="bigtitle">Heute</h1>
+  <h1 class="bigtitle">heute</h1>
   <p class="meta-line">${meta}</p>
   ${on(state, 'board') ? todayBoard(state) : ''}
   ${o.overdue.length ? `<section class="section">${group('überfällig')}${o.overdue.map((id) => taskLine(state, byId.get(id), state.today)).join('')}</section>` : ''}
-  ${hasPlan || on(state, 'meals') || on(state, 'chores') ? `<section class="section">${group('heute')}${extras}${todayRows || (extras ? '' : `<p class="empty">${esc(MSG.nothingToday)}</p>`)}</section>` : ''}
+  ${hasPlan || on(state, 'meals') || on(state, 'chores') ? `<section class="section">${group('heute')}${extras}${todayRows || (extras ? '' : emptyState('today', MSG.nothingToday))}</section>` : ''}
   ${on(state, 'contacts') ? todayBirthdays(state) : ''}
-  ${hasPlan ? `<section class="section"><h2 class="head2">Diese Woche</h2>${week || `<p class="empty">${esc(MSG.nothingWeek)}</p>`}</section>` : ''}`;
+  ${hasPlan ? `<section class="section"><h2 class="head2">diese woche</h2>${week || `<p class="empty">${esc(MSG.nothingWeek)}</p>`}</section>` : ''}`;
 }
 
 function todayBoard(state) {
   const notes = pinnedNotes(state.data.notes);
   const cards = notes.map((n) => `<div class="pin"><div class="t">${n.title ? `<b>${esc(n.title)}</b>` : ''}${n.body ? `<p>${esc(n.body)}</p>` : ''}
-    <span class="cap">${esc(memberName(state, n.changedBy) || '')}</span></div>${iconBtn('close', 'Abnehmen', `data-action="unpin" data-id="${n.id}"`)}</div>`).join('');
+    ${who(state, n.changedBy) || `<span class="cap">${esc(memberName(state, n.changedBy) || '')}</span>`}</div>${iconBtn('close', 'Abnehmen', `data-action="unpin" data-id="${n.id}"`)}</div>`).join('');
   return `<section class="section board">${group('pinnwand')}${cards}
     <form class="search" data-form="add-pin"><input name="body" autocomplete="off" aria-label="Auf die Pinnwand" placeholder="Nachricht an alle" required>
     <button class="iconbtn" type="submit" aria-label="Anheften" title="Anheften">${icon('plus')}</button></form></section>`;
@@ -219,6 +253,7 @@ function listPicker(state, kind, currentId) {
   const opts = lists.map((l) => `<option value="${l.id}" ${l.id === currentId ? 'selected' : ''}>${esc(l.name.toLocaleLowerCase('de-DE'))}</option>`).join('');
   return `<div class="listbar">
     <label class="field"><select aria-label="Liste" data-action="pick-list" data-kind="${kind}">${opts}</select></label>
+    ${kind !== 'template' ? iconBtn('share', 'Liste teilen', `data-action="share-list" data-id="${currentId}"`) : ''}
     ${iconBtn('edit', 'Liste umbenennen', `data-action="rename-list" data-id="${currentId}"`)}
     ${iconBtn('plus', 'Neue Liste', `data-action="new-list" data-kind="${kind}"`)}</div>`;
 }
@@ -234,22 +269,38 @@ function renderShopping(state) {
   const g = groupShopping(itemsOf(state.data.items, list.id));
   const open = g.open.reduce((n, grp) => n + grp.items.length, 0);
   const groups = g.open.map((grp) => `<section class="section">${group(CATEGORY[grp.category])}
-    ${grp.items.map((i) => shopRow(i)).join('')}</section>`).join('');
+    ${grp.items.map((i) => shopRow(state, i)).join('')}</section>`).join('');
+  // Vorschläge aus früheren Einkäufen, ohne das, was gerade offen auf der Liste steht
+  const shopLists = new Set(state.data.lists.filter((l) => l.kind === 'shopping' || l.kind === 'template').map((l) => l.id));
+  const onList = new Set(g.open.flatMap((grp) => grp.items.map((i) => i.title.toLowerCase())));
+  const suggest = shoppingHistory(state.data.items, shopLists).titles.filter((t) => !onList.has(t.toLowerCase()));
   return `${listPicker(state, 'shopping', list.id)}
   <p class="meta-line">${open} offen${g.done.length ? `${sep}${g.done.length} erledigt` : ''}</p>
   <form class="search" data-form="add-shopping">
-    <input name="text" autocomplete="off" aria-label="Hinzufügen" placeholder="2 Milch, Brot, Äpfel" enterkeyhint="done">
+    <input name="text" autocomplete="off" list="shop-suggest" aria-label="Hinzufügen" placeholder="2 Milch, Brot, Äpfel" enterkeyhint="done">
     <select name="category" aria-label="Bereich">${SHOPPING_CATEGORIES.map((c) => `<option value="${c}" ${c === state.lastCategory ? 'selected' : ''}>${esc(CATEGORY[c])}</option>`).join('')}</select>
     <button class="iconbtn" type="submit" aria-label="Dazu" title="Dazu">${icon('plus')}</button></form>
-  ${groups || `<p class="empty">${esc(MSG.emptyList)}</p>`}
-  ${g.done.length ? doneBlock(list.id, g.done.map((i) => shopRow(i))) : ''}
+  <datalist id="shop-suggest">${suggest.map((t) => `<option value="${attr(t)}">`).join('')}</datalist>
+  ${groups || emptyState('shopping', MSG.emptyList)}
+  ${g.done.length ? doneBlock(list.id, g.done.map((i) => shopRow(state, i))) : ''}
   ${templatePicker(state, list.id)}`;
 }
 
-function shopRow(i) {
+function shopRow(state, i) {
+  const editing = state.editing === i.id;
   const title = `${i.quantity ? `<span class="fill">${esc(i.quantity)}</span> ` : ''}${esc(i.title)}`;
-  const picker = `<select class="mini" aria-label="Bereich für ${attr(i.title)}" data-action="set-category" data-id="${i.id}">${SHOPPING_CATEGORIES.map((c) => `<option value="${c}" ${c === (i.category || 'other') ? 'selected' : ''}>${esc(CATEGORY[c])}</option>`).join('')}</select>`;
-  return checkLine(i, title, '', picker);
+  const edit = `<button class="iconbtn" type="button" data-action="edit" data-id="${i.id}" aria-expanded="${editing}" aria-label="${editing ? 'Fertig' : 'Ändern'}" title="${editing ? 'Fertig' : 'Ändern'}">${icon('edit')}</button>`;
+  // Wer etwas auf die Liste gesetzt hat, steht nur bei den anderen dabei.
+  const by = i.changedBy && i.changedBy !== state.session?.user.id ? who(state, i.changedBy) : '';
+  const head = checkLine(i, title, i.note ? esc(i.note) : '', by + edit);
+  if (!editing) return head;
+  return head + `<form class="editor taskedit" data-form="edit-shop" data-id="${i.id}">
+    <div class="pair"><label class="field"><span class="cap">was</span><input name="title" value="${attr(i.title)}" required></label>
+      <label class="field"><span class="cap">menge</span><input name="quantity" value="${attr(i.quantity || '')}" placeholder="2, 500 g"></label></div>
+    <label class="field"><span class="cap">bereich</span><select name="category">${SHOPPING_CATEGORIES.map((c) => `<option value="${c}" ${c === (i.category || 'other') ? 'selected' : ''}>${esc(CATEGORY[c])}</option>`).join('')}</select></label>
+    <label class="field"><span class="cap">notiz</span><input name="note" value="${attr(i.note || '')}" placeholder="z. B. die laktosefreie"></label>
+    <div class="actions"><button class="btn primary" type="submit">Speichern</button>
+      <button class="btn" type="button" data-action="delete-item" data-id="${i.id}">Löschen</button></div></form>`;
 }
 
 function renderTasks(state) {
@@ -263,7 +314,7 @@ function renderTasks(state) {
     <input name="title" autocomplete="off" aria-label="Neue Aufgabe" placeholder="Neue Aufgabe" required>
     <input name="dueDate" type="date" aria-label="Fällig">
     <button class="iconbtn" type="submit" aria-label="Dazu" title="Dazu">${icon('plus')}</button></form>
-  <section class="section">${open.map((i) => taskRow(state, i)).join('') || `<p class="empty">${esc(MSG.emptyList)}</p>`}</section>
+  <section class="section">${open.map((i) => taskRow(state, i)).join('') || emptyState('tasks', done.length ? MSG.allDone : MSG.emptyList)}</section>
   ${done.length ? doneBlock(list.id, done.map((i) => taskRow(state, i))) : ''}
   ${templatePicker(state, list.id)}`;
 }
@@ -280,7 +331,7 @@ function templatePicker(state, listId) {
 function taskRow(state, i) {
   const editing = state.editing === i.id;
   const edit = `<button class="iconbtn" type="button" data-action="edit" data-id="${i.id}" aria-expanded="${editing}" aria-label="${editing ? 'Fertig' : 'Ändern'}" title="${editing ? 'Fertig' : 'Ändern'}">${icon('edit')}</button>`;
-  const head = checkLine(i, esc(i.title), taskTags(state, i, state.today, true), edit);
+  const head = checkLine(i, esc(i.title), taskTags(state, i, state.today, true), who(state, i.assignee) + edit);
   if (!editing) return head;
   const members = state.members.map((m) => `<option value="${m.id}" ${m.id === i.assignee ? 'selected' : ''}>${esc(m.name || 'ohne Namen')}</option>`).join('');
   return head + `<form class="editor taskedit" data-form="edit-task" data-id="${i.id}">
@@ -298,17 +349,37 @@ function taskRow(state, i) {
 function renderCalendar(state) {
   const from = addDays(state.today, state.calOffset * 28);
   const to = addDays(from, 27);
-  const days = agenda({ ...state.data, items: [] }, from, to);
+  const days = agenda({ ...state.data, events: state.events, items: [] }, from, to);
   const editing = state.editing && state.data.events.find((e) => e.id === state.editing);
   const list = days.map((d) => `<div class="day">${group(dayLabel(d.date, state.today, true))}
-    ${d.events.map((occ) => { const p = eventParts(state, occ, state.today); return `<button type="button" class="item" data-action="edit-event" data-id="${p.ev.id}">${p.inner}</button>`; }).join('')}</div>`).join('');
+    ${d.events.map((occ) => { const p = eventParts(state, occ, state.today); return p.ev.feed ? `<div class="item feed">${p.inner}</div>` : `<button type="button" class="item" data-action="edit-event" data-id="${p.ev.id}">${p.inner}</button>`; }).join('')}</div>`).join('');
   return `
   <h1 class="bigtitle">Kalender</h1>
   <div class="calbar">${iconBtn('back', 'Vier Wochen zurück', 'data-action="cal-move" data-step="-1"')}
     <span class="cap">${esc(fmtRange.format(asDate(from)))} – ${esc(fmtRange.format(asDate(to)))}</span>
     ${iconBtn('next', 'Vier Wochen weiter', 'data-action="cal-move" data-step="1"')}</div>
   ${eventForm(state, editing || null)}
-  <section class="section">${list || `<p class="empty">${esc(MSG.noEvents)}</p>`}</section>`;
+  <section class="section">${list || emptyState('calendar', MSG.noEvents)}</section>
+  ${feedSection(state)}`;
+}
+
+/** Fremde Kalender: Liste mit Stand und Formular zum Hinzufügen. */
+function feedSection(state) {
+  const cals = alive(state.data.calendars).sort((a, b) => a.title.localeCompare(b.title, 'de'));
+  const rows = cals.map((c) => {
+    const f = state.feeds?.[c.id];
+    const status = !f ? 'lädt …' : f.error ? MSG.feedError : `${MSG.feedLoaded(f.events.length)}${sep}${esc(new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(new Date(f.at)))}`;
+    return `<div class="item"><span class="t"><b>${esc(c.title || 'kalender')}</b><span${f?.error ? ' class="err"' : ''}>${status}</span></span>
+      ${iconBtn('close', 'Kalender entfernen', `data-action="delete" data-collection="calendars" data-id="${c.id}"`)}</div>`;
+  }).join('');
+  return `<details${state.editing === 'feeds' ? ' open' : ''}><summary>fremde kalender${cals.length ? ` (${cals.length})` : ''}</summary><div>
+    <p class="empty small">${esc(MSG.feedsHint)}${state.session ? '' : ` ${esc(MSG.feedsLocal)}`}</p>
+    ${rows}
+    <form class="editor" data-form="add-calendar">
+      <div class="pair"><label class="field"><span class="cap">name</span><input name="title" placeholder="Schulferien" required></label>
+        <label class="field"><span class="cap">adresse</span><input name="url" autocomplete="off" autocapitalize="none" placeholder="webcal://…" required></label></div>
+      <div class="actions"><button class="btn primary" type="submit">Hinzufügen</button>
+        ${cals.length ? '<button class="btn" type="button" data-action="reload-feeds">Neu laden</button>' : ''}</div></form></div></details>`;
 }
 
 function eventForm(state, ev) {
@@ -365,7 +436,7 @@ function choreLine(state, c, st) {
   const edit = currentTab(state) === 'chores'
     ? `<button class="iconbtn" type="button" data-action="edit" data-id="${c.id}" aria-expanded="${state.editing === c.id}" aria-label="Ändern" title="Ändern">${icon('edit')}</button>` : '';
   return `<div class="item"><label class="check"><input type="checkbox" data-action="chore-done" data-id="${c.id}" ${st.done ? 'checked' : ''} ${st.notYet ? 'disabled' : ''}>
-    <span class="t"><b>${esc(c.title)}</b><span>${parts.filter(Boolean).map(esc).join(sep)}</span></span></label>${edit}</div>`;
+    <span class="t"><b>${esc(c.title)}</b><span>${parts.filter(Boolean).map(esc).join(sep)}</span></span></label>${!st.done && !st.notYet ? who(state, st.assignee) : ''}${edit}</div>`;
 }
 
 function renderChores(state) {
@@ -374,7 +445,7 @@ function renderChores(state) {
   return `
   <h1 class="bigtitle">Haushalt</h1>
   <p class="meta-line">im wechsel${sep}wer dran ist, steht auch auf „heute“</p>
-  <section class="section">${rows || `<p class="empty">${esc(MSG.noChores)}</p>`}</section>
+  <section class="section">${rows || emptyState('tasks', MSG.noChores)}</section>
   <details ${chores.length ? '' : 'open'}><summary>neue aufgabe im plan</summary><div>${choreForm(state, null)}</div></details>`;
 }
 
@@ -424,7 +495,7 @@ function expenseRow(state, e) {
     ? `ausgleich an ${memberName(state, e.people[0]) || '–'}`
     : [e.paidBy ? `${memberName(state, e.paidBy) || 'jemand'} hat bezahlt` : '', e.people.length === 1 ? `für ${memberName(state, e.people[0])}` : '', dayLabel(e.date, state.today)].filter(Boolean).join(' · ');
   return `<div class="item"><span class="t"><b>${esc(e.kind === 'settle' ? `${memberName(state, e.paidBy)} → ${memberName(state, e.people[0])}` : e.title || 'Ausgabe')}</b><span>${esc(sub)}</span></span>
-    <span class="n">${esc(money(e.amount))}</span>${iconBtn('close', 'Löschen', `data-action="delete" data-collection="expenses" data-id="${e.id}" data-confirm="1"`)}</div>`;
+    <span class="n">${esc(money(e.amount))}</span>${iconBtn('close', 'Löschen', `data-action="delete" data-collection="expenses" data-id="${e.id}"`)}</div>`;
 }
 
 function expenseForm(state) {
@@ -454,7 +525,7 @@ function renderProjects(state) {
   <h1 class="bigtitle">Projekte</h1>
   <form class="search" data-form="add-project"><input name="name" autocomplete="off" aria-label="Neues Projekt" placeholder="Neues Projekt, z. B. Kinderzimmer streichen" required>
     <button class="iconbtn" type="submit" aria-label="Anlegen" title="Anlegen">${icon('plus')}</button></form>
-  <section class="section">${active.map(row).join('') || `<p class="empty">${esc(MSG.noProjects)}</p>`}</section>
+  <section class="section">${active.map(row).join('') || emptyState('projects', MSG.noProjects)}</section>
   ${archived.length ? `<details><summary>abgeschlossen (${archived.length})</summary><div>${archived.map(row).join('')}</div></details>` : ''}`;
 }
 
@@ -486,7 +557,7 @@ function renderNotes(state) {
   return `
   <h1 class="bigtitle">Notizen</h1>
   <details ${notes.length ? '' : 'open'}><summary>neue notiz</summary><div>${noteForm(state, null)}</div></details>
-  <section class="section">${rows || `<p class="empty">${esc(MSG.noNotes)}</p>`}</section>`;
+  <section class="section">${rows || emptyState('notes', MSG.noNotes)}</section>`;
 }
 
 function noteForm(state, n) {
@@ -496,7 +567,7 @@ function noteForm(state, n) {
     <label class="field"><span class="cap">text</span><textarea name="body" rows="${n ? 6 : 3}">${esc(v.body)}</textarea></label>
     ${on(state, 'board') ? `<label class="check inline"><input type="checkbox" name="pinned" ${v.pinned ? 'checked' : ''}><span class="t"><b>an die pinnwand</b></span></label>` : ''}
     <div class="actions"><button class="btn primary" type="submit">Speichern</button>
-      ${n ? `<button class="btn" type="button" data-action="cancel-edit">Schließen</button><button class="btn" type="button" data-action="delete" data-collection="notes" data-id="${n.id}" data-confirm="1">Löschen</button>` : ''}</div></form>`;
+      ${n ? `<button class="btn" type="button" data-action="cancel-edit">Schließen</button><button class="btn" type="button" data-action="delete" data-collection="notes" data-id="${n.id}">Löschen</button>` : ''}</div></form>`;
 }
 
 // ---- Kontakte ------------------------------------------------------------------
@@ -517,7 +588,7 @@ function renderContacts(state) {
   <h1 class="bigtitle">Kontakte</h1>
   ${soon.length ? `<section class="section">${group('nächste geburtstage')}${soon.map((b) => birthdayLine(state, byId.get(b.contactId), b)).join('')}</section>` : ''}
   <details ${contacts.length ? '' : 'open'}><summary>neuer kontakt</summary><div>${contactForm(state, null)}</div></details>
-  <section class="section">${group('alle')}${rows || `<p class="empty">${esc(MSG.noContacts)}</p>`}</section>`;
+  <section class="section">${group('alle')}${rows || emptyState('contacts', MSG.noContacts)}</section>`;
 }
 
 function contactForm(state, c) {
@@ -531,7 +602,7 @@ function contactForm(state, c) {
     <label class="field"><span class="cap">adresse</span><textarea name="address" rows="2">${esc(v.address || '')}</textarea></label>
     <label class="field"><span class="cap">notiz</span><input name="note" value="${attr(v.note || '')}"></label>
     <div class="actions"><button class="btn primary" type="submit">Speichern</button>
-      ${c ? `<button class="btn" type="button" data-action="cancel-edit">Schließen</button><button class="btn" type="button" data-action="delete" data-collection="contacts" data-id="${c.id}" data-confirm="1">Löschen</button>` : ''}</div></form>`;
+      ${c ? `<button class="btn" type="button" data-action="cancel-edit">Schließen</button><button class="btn" type="button" data-action="delete" data-collection="contacts" data-id="${c.id}">Löschen</button>` : ''}</div></form>`;
 }
 
 // ---- Geschenkideen ---------------------------------------------------------------
@@ -557,7 +628,7 @@ function renderGifts(state) {
     <label class="field"><span class="cap">link oder notiz</span><input name="extra" autocomplete="off"></label>
     <label class="check inline"><input type="checkbox" name="private" checked><span class="t"><b>nur für mich sichtbar</b></span></label>
     <div class="actions"><button class="btn primary" type="submit">Merken</button></div></form>
-  ${list || `<p class="empty">${esc(MSG.noGifts)}</p>`}`;
+  ${list || emptyState('gifts', MSG.noGifts)}`;
 }
 
 // ---- Vorlagen ----------------------------------------------------------------------
@@ -565,7 +636,7 @@ function renderGifts(state) {
 function renderTemplates(state) {
   const t = state.data.lists.find((l) => l.id === state.templateId && !l.deleted && l.kind === 'template');
   if (!t) {
-    return `<h1 class="bigtitle">Vorlagen</h1><p class="empty">${esc(MSG.noTemplates)}</p>
+    return `<h1 class="bigtitle">Vorlagen</h1>${emptyState('projects', MSG.noTemplates)}
       <div class="actions-row"><button class="btn primary" type="button" data-action="new-list" data-kind="template">Neue Vorlage</button></div>`;
   }
   const items = itemsOf(state.data.items, t.id).sort((a, b) => a.sort - b.sort);
@@ -652,13 +723,13 @@ function renderMore(state) {
   const s = state.session;
   const extra = tabLayout(state.settings.modules).more;
   const account = s
-    ? `${infoRow('Speicherort', esc(STORAGE[state.settings.storage][0]))}
-       ${infoRow('Server', `<code class="invite">${esc(s.serverUrl)}</code>`)}
-       ${infoRow('Angemeldet als', esc(s.user.name || s.user.email))}
-       ${infoRow('Haushalt', esc(s.household?.name || '–'))}
-       ${s.household?.inviteCode ? `<div class="item"><span class="t"><span>Einladungscode für deinen Partner</span><b><code class="invite">${esc(s.household.inviteCode)}</code></b></span>
+    ? `${infoRow('speicherort', esc(STORAGE[state.settings.storage][0]))}
+       ${infoRow('server', `<code class="invite">${esc(s.serverUrl)}</code>`)}
+       ${infoRow('angemeldet als', esc(s.user.name || s.user.email))}
+       ${infoRow('haushalt', esc(s.household?.name || '–'))}
+       ${s.household?.inviteCode ? `<div class="item"><span class="t"><span>einladungscode für deinen partner</span><b><code class="invite">${esc(s.household.inviteCode)}</code></b></span>
          <button class="btn small" type="button" data-action="copy-code">Kopieren</button></div>` : ''}
-       ${infoRow('Mitglieder', state.members.map((m) => esc(m.name || '–')).join(', ') || '–')}
+       ${infoRow('mitglieder', state.members.map((m) => `${who(state, m.id)}${esc(m.name || '–')}`).join('<span class="sep">·</span>') || '–')}
        ${!s.household ? householdForms() : `<details><summary>anderem haushalt beitreten</summary><div>${joinForm()}</div></details>`}
        <div class="actions-row"><button class="btn" type="button" data-action="sync-now">Jetzt abgleichen</button>
           <button class="btn quiet" type="button" data-action="logout">Abmelden / Speicherort wechseln</button></div>`
@@ -672,12 +743,66 @@ function renderMore(state) {
   <section class="section">${group('module')}
     <p class="empty">Was ausgeschaltet ist, verschwindet überall. Die Einträge bleiben gespeichert.</p>
     <div class="choices">${moduleChecks(state, false)}</div></section>
+  <section class="section">${group('erinnerungen')}${pushSection(state)}</section>
   <section class="section">${group('darstellung')}
     <label class="field"><span class="cap">farbschema</span><select data-action="theme">${Object.entries(THEME).map(([k, v]) => `<option value="${k}" ${k === state.settings.theme ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label></section>
   <section class="section">${group('sicherung')}
-    <p class="empty">Alle Einträge als Datei sichern oder aus einer Sicherung zurückholen.</p>
+    <p class="empty">Alle Einträge als Datei sichern oder aus einer Sicherung zurückholen.
+      ${esc(state.lastExport ? MSG.lastBackup(dayLabel(state.lastExport, state.today, true)) : MSG.noBackupYet)}
+      ${s ? esc(MSG.backupServer) : ''}</p>
     <div class="actions-row"><button class="btn" type="button" data-action="export">Sicherung speichern</button>
       <label class="btn">Sicherung laden<input type="file" accept="application/json,.json" data-action="import" hidden></label></div></section>`;
+}
+
+/** Erinnerungen ein- und ausschalten, je Gerät. state.push: unsupported | no-server | off | on | denied */
+function pushSection(state) {
+  const p = state.push;
+  if (!state.session) return `<p class="empty">${esc(MSG.pushLocal)}</p>`;
+  const text = { unsupported: MSG.pushUnsupported, 'no-server': MSG.pushNoServer, denied: MSG.pushDenied, on: MSG.pushOn, off: MSG.pushOff }[p] || '';
+  const buttons = p === 'on'
+    ? '<button class="btn" type="button" data-action="push-test">Test senden</button><button class="btn quiet" type="button" data-action="push-off">Ausschalten</button>'
+    : p === 'off' ? '<button class="btn primary" type="button" data-action="push-on">Einschalten</button>' : '';
+  return `<p class="empty">${esc(MSG.pushHint)} ${esc(text)}</p>${buttons ? `<div class="actions-row">${buttons}</div>` : ''}`;
+}
+
+// ---- Suche ---------------------------------------------------------------------
+
+/** Daten der eingeschalteten Module, für die Suche. */
+function searchable(state) {
+  const d = state.data;
+  const kinds = new Set([on(state, 'shopping') && 'shopping', on(state, 'tasks') && 'tasks', on(state, 'projects') && 'project'].filter(Boolean));
+  const off = (m, list) => (on(state, m) ? list : []);
+  return {
+    lists: d.lists.filter((l) => kinds.has(l.kind)), items: d.items, events: off('calendar', d.events), notes: off('notes', d.notes),
+    contacts: off('contacts', d.contacts), gifts: off('gifts', visibleGifts(d.gifts, state.session?.user.id || null)),
+    meals: off('meals', d.meals), expenses: off('expenses', d.expenses), chores: off('chores', d.chores),
+  };
+}
+
+function renderSearch(state) {
+  const q = state.query || '';
+  const hits = search(searchable(state), q);
+  const areas = [...new Set(hits.map((h) => h.area))];
+  const sub = (h) => (/^\d{4}-\d{2}-\d{2}$/.test(h.sub) ? dayLabel(h.sub, state.today) : h.sub);
+  const list = areas.map((a) => `<section class="section">${group(AREA[a])}${hits.filter((h) => h.area === a).map((h) => `<button type="button" class="item${h.done ? ' done' : ''}" data-action="open-result" data-area="${h.area}" data-id="${h.id}" data-list="${h.list || ''}">
+    <span class="t"><b>${esc(h.title || '–')}</b>${h.sub ? `<span>${esc(sub(h))}</span>` : ''}</span>${icon('next')}</button>`).join('')}</section>`).join('');
+  return `
+  <h1 class="bigtitle">Suche</h1>
+  <form class="search" data-form="search" role="search">
+    <input name="q" type="search" autocomplete="off" aria-label="Suchen" placeholder="Was suchst du?" value="${attr(q)}" data-live="search" enterkeyhint="search">
+  </form>
+  ${q.trim().length < 2 ? `<p class="empty">${esc(MSG.searchHint)}</p>` : list || emptyState('search', MSG.noResults)}`;
+}
+
+/** Liste als Text zum Teilen; Einkauf nach Bereich im Laden, Aufgaben nur die offenen. */
+export function shareText(state, listId) {
+  const list = state.data.lists.find((l) => l.id === listId);
+  const items = itemsOf(state.data.items, listId);
+  if (list.kind === 'shopping') {
+    const g = groupShopping(items);
+    return `${list.name}\n${g.open.map((grp) => `\n${CATEGORY[grp.category]}\n${grp.items.map((i) => `– ${i.quantity ? `${i.quantity} ` : ''}${i.title}`).join('\n')}`).join('\n')}`;
+  }
+  return `${list.name}\n\n${sortTasks(items).filter((i) => !i.done).map((i) => `– ${i.title}${i.dueDate ? ` (${dayLabel(i.dueDate, state.today)})` : ''}`).join('\n')}`;
 }
 
 function householdForms() {

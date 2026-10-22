@@ -46,6 +46,7 @@ func main() {
 		tsDir = filepath.Join(app.DataDir(), "..", "tailscale")
 	}
 	ts := newTailnet(tsHostname, tsDir)
+	setupPush(app)
 
 	// Zustand für die Mac-App, nur über 127.0.0.1 abrufbar.
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {

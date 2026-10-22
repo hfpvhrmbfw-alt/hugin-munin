@@ -6,7 +6,7 @@ Die Mac-App ersetzt die Terminal-Schritte aus [MAC-MINI.md](MAC-MINI.md). Sie si
 
 | Teil | Ordner | Aufgabe |
 |---|---|---|
-| Server `hm-server` | `mac/server/` (Go) | PocketBase mit `server/pb_migrations`, `server/pb_hooks` und der PWA, dazu Tailscale über `tsnet`. Der Server ist selbst ein Gerät im Tailnet und hat eine eigene HTTPS-Adresse. |
+| Server `hm-server` | `mac/server/` (Go) | PocketBase mit `server/pb_migrations`, `server/pb_hooks` und der PWA, dazu Tailscale über `tsnet`. Der Server ist selbst ein Gerät im Tailnet und hat eine eigene HTTPS-Adresse. Er verschickt auch die Erinnerungen (siehe unten). |
 | Oberfläche | `mac/app/` (SwiftUI) | Startet den Server, startet ihn nach einem Absturz neu, hält den Mac wach, zeigt Zustand, Adresse als QR-Code, letzte Sicherung. |
 | Bauen | `mac/build-app.sh` | Baut `Hugin & Munin.app` und ein ZIP nach `mac/dist/`. GitHub baut es bei jeder Änderung (Actions → „Mac-App“ → Artefakt `HuginMunin-mac`). |
 
@@ -37,6 +37,21 @@ tailscale serve reset
 ```
 
 Die Adresse ändert sich auf den neuen Gerätenamen. In der App auf den Handys unter **Mehr** die neue Serveradresse eintragen und neu anmelden. Die Daten bleiben.
+
+## Erinnerungen (Push)
+
+Der Server prüft alle 5 Minuten, was fällig ist, und schickt es an die Geräte, auf denen unter **Mehr → erinnerungen** „Einschalten“ gedrückt wurde:
+
+- ab 7:30 einmal am Tag ein Überblick je Person: Termine, für die sie eingetragen ist (oder ohne Personen), fällige und überfällige Aufgaben (ihr zugewiesen oder niemandem), Geburtstage. War der Mac bis 11 Uhr aus, entfällt der Überblick an diesem Tag.
+- 30 Minuten vor Terminen mit Uhrzeit.
+
+Jede Erinnerung geht nur einmal raus (`push_sent`). Die Schlüssel (VAPID) liegen in `<Daten>/vapid.json` und bleiben dort; neue Schlüssel würden alle Geräte abmelden. Abgemeldete Geräte (Antwort 404/410) entfernt der Server selbst. Zeitzone ist die des Mac.
+
+Auf dem iPhone kommen Mitteilungen nur, wenn die App vom Home-Bildschirm geöffnet und dort eingeschaltet wurde (iOS 16.4 oder neuer). Mit **Test senden** lässt sich das prüfen.
+
+## Sicherung
+
+Jede Nacht um 3 Uhr legt der Server eine Sicherung an und behält die letzten 14 (Einstellung aus der Migration, in der PocketBase-Verwaltung unter Settings → Backups änderbar).
 
 ## Ordner
 
