@@ -1,9 +1,9 @@
 // Service Worker: App-Hülle offline verfügbar machen. Daten laufen nie über den Cache.
-const VERSION = 'hm-13';
+const VERSION = 'hm-14';
 const SHELL = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'src/main.js', 'src/model.js', 'src/logic.js', 'src/storage.js', 'src/sync.js', 'src/texts.js', 'src/ui.js', 'src/raven.js',
-  'icons/favicon.png', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 
+  'fonts/asap.woff2', 'fonts/chivo-mono.woff2', 'icons/favicon.png', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 
   ...['shopping', 'tasks', 'calendar', 'today', 'notes', 'contacts', 'gifts', 'projects', 'search'].flatMap((m) => [`icons/rabe-${m}.png`, `icons/rabe-${m}-rand.png`]),
   ...['kopf', 'sitzt', 'fliegt', 'huepft', 'schlaeft', 'zwei', 'schaut', 'traegt', 'landet'].map((m) => `icons/mini-${m}.png`),
 ];
@@ -22,14 +22,6 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET' || url.pathname.startsWith('/api/') || url.pathname.startsWith('/_/')) return;
   if (url.origin === location.origin) {
     e.respondWith(caches.match(e.request, { ignoreSearch: true }).then((hit) => hit || fetch(e.request)));
-  } else if (url.hostname.endsWith('fonts.googleapis.com') || url.hostname.endsWith('fonts.gstatic.com')) {
-    e.respondWith(caches.open(VERSION).then(async (c) => {
-      const hit = await c.match(e.request);
-      if (hit) return hit;
-      const res = await fetch(e.request);
-      if (res.ok) c.put(e.request, res.clone());
-      return res;
-    }));
   }
 });
 
@@ -38,7 +30,7 @@ self.addEventListener('push', (e) => {
   let msg = {};
   try { msg = e.data ? e.data.json() : {}; } catch { msg = { body: e.data ? e.data.text() : '' }; }
   e.waitUntil(self.registration.showNotification(msg.title || 'Hugin & Munin', {
-    body: msg.body || '', tag: msg.tag || undefined, icon: 'icons/icon-192.png', badge: 'icons/favicon.png', data: { url: msg.url || './' },
+    body: msg.body || '', tag: msg.tag || undefined, icon: 'icons/icon-192.png', badge: 'fonts/asap.woff2', 'fonts/chivo-mono.woff2', 'icons/favicon.png', data: { url: msg.url || './' },
   }));
 });
 

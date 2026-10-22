@@ -5,7 +5,7 @@ import {
 } from './model.js';
 import {
   splitQuickAdd, itemsOf, serverAddress, addressWarning, guessStorage, fromTemplate, parseAmount, parseDayMonth,
-  shoppingHistory, parseIcs, addDays, alive,
+  shoppingHistory, parseIcs, addDays, alive, guessCategory,
 } from './logic.js';
 import * as storage from './storage.js';
 import { createClient, markDirty, syncOnce, subscribe } from './sync.js';
@@ -28,13 +28,15 @@ const state = {
   session: null, // { serverUrl, token, user:{id,email,name}, household:{id,name,inviteCode}|null }
   householdId: '',
   members: [],
-  tab: 'today', shopListId: '', taskListId: '', templateId: '', projectId: '', lastCategory: 'other',
-  editing: null, calOffset: 0, mealOffset: 0, flash: '',
+  tab: 'today', shopListId: '', taskListId: '', templateId: '', projectId: '',
+  editing: null, calOffset: 0, calView: 'list', calDay: '', mealOffset: 0, flash: '',
   undo: null, // { text, changes:[{collection, id, fields}] } für „rückgängig“
   query: '', prevTab: 'today',
   feeds: {}, // fremde Kalender: { [calendarId]: { url, at, events, error } }
   push: '', // Erinnerungen auf diesem Gerät, siehe pushSection in ui.js
   lastExport: '',
+  installHint: '', // 'ios' | 'prompt' | '' : Hinweis „auf den Home-Bildschirm“
+  backupDue: false, // nur auf diesem Gerät und lange nicht gesichert
   sync: { status: 'local', at: 0, message: '' },
   today: localToday(),
   setup: false, // Einrichtung beim ersten Start
@@ -51,14 +53,21 @@ function applyTheme() {
   else document.documentElement.setAttribute('data-theme', state.settings.theme);
 }
 
+let lastTab = '';
 function render(focusSelector) {
   state.today = localToday();
   state.now = fmtTime.format(new Date());
+  updateHints();
   const active = document.activeElement;
   const form = active && active.name ? active.closest('form') : null;
   const keep = focusSelector || (form ? `form[data-form="${form.dataset.form}"] [name="${active.name}"]` : null);
   const typed = !focusSelector && form && 'value' in active ? { value: active.value, start: active.selectionStart } : null;
+  // Aufgeklappte Bereiche („neuer kontakt“ …) bleiben beim Neuzeichnen offen, solange man im selben Bereich bleibt.
+  const sameTab = lastTab === state.tab;
+  const opened = sameTab ? new Set([...root.querySelectorAll('details[open] > summary')].map((x) => x.textContent)) : new Set();
+  lastTab = state.tab;
   root.innerHTML = renderShell(state);
+  for (const x of root.querySelectorAll('details:not([open]) > summary')) if (opened.has(x.textContent)) x.parentElement.open = true;
   const el = keep ? root.querySelector(keep) : null;
   if (!el) return;
   el.focus();
@@ -419,6 +428,8 @@ const actions = {
   'cancel-edit': () => { state.editing = null; render(); },
   'delete-event': async (el) => { await changeWithUndo('events', [el.dataset.id], { deleted: true }, MSG.undoDeleted); state.editing = null; render(); },
   'cal-move': (el) => { state.calOffset += Number(el.dataset.step); render(); },
+  'cal-view': (el) => { state.calView = el.dataset.view; state.calOffset = 0; state.calDay = ''; render(); },
+  'cal-day': (el) => { state.calDay = el.dataset.date; state.editing = null; render(); },
   'meal-move': (el) => { state.mealOffset += Number(el.dataset.step); render(); },
   theme: async (el) => { await saveSettings({ theme: el.value }); applyTheme(); render(); },
   'pick-storage': (el) => {
@@ -462,6 +473,16 @@ const actions = {
   'apply-template': (el) => applyTemplate(el.value, el.dataset.list),
   'apply-template-from': (el) => applyTemplate(el.dataset.template, el.value),
   'sync-now': () => scheduleSync(0),
+  'dismiss-hint': async (el) => {
+    if (el.dataset.hint === 'install') hintMeta.installDismissed = true; else hintMeta.backupLater = state.today;
+    await store.setMeta('hints', hintMeta); render();
+  },
+  install: async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice.catch(() => null);
+    installPrompt = null; render();
+  },
   'copy-code': async () => { try { await navigator.clipboard.writeText(state.session.household.inviteCode); flash(MSG.copied); } catch { /* Kopieren nicht erlaubt */ } },
   logout: async () => {
     if (!confirm(MSG.confirmLogout)) return;
@@ -493,17 +514,16 @@ const actions = {
 
 const forms = {
   'add-shopping': async (f) => {
-    // Bekannte Sachen landen im zuletzt benutzten Bereich, außer der Bereich wurde gerade von Hand gewählt.
-    const chosen = f.category.value; const manual = chosen !== state.lastCategory; state.lastCategory = chosen;
+    // Bereich: von Hand gewählt, sonst wie beim letzten Mal, sonst aus dem Namen geraten.
+    const chosen = f.category.value;
     const known = shoppingHistory(state.data.items, new Set(state.data.lists.filter((l) => l.kind === 'shopping').map((l) => l.id))).category;
     for (const p of splitQuickAdd(f.text.value)) {
-      const category = manual ? chosen : known.get(p.title.toLowerCase()) || chosen;
+      const category = chosen || known.get(p.title.toLowerCase()) || guessCategory(p.title) || 'other';
       await save('items', newItem(ctx(), state.shopListId, p.title, { quantity: p.quantity, category }));
     }
     render('form[data-form="add-shopping"] [name="text"]');
   },
   'edit-shop': async (f) => {
-    state.lastCategory = f.category.value;
     await update('items', f.dataset.id, { title: f.title.value, quantity: f.quantity.value, category: f.category.value, note: f.note.value });
     state.editing = null; render();
   },
@@ -614,8 +634,10 @@ const forms = {
     render('form[data-form="add-gift"] [name="title"]');
   },
   'add-template-item': async (f) => {
-    const category = f.category.value; state.lastCategory = category;
-    for (const p of splitQuickAdd(f.text.value)) await save('items', newItem(ctx(), state.templateId, p.title, { quantity: p.quantity, category }));
+    const chosen = f.category.value;
+    for (const p of splitQuickAdd(f.text.value)) {
+      await save('items', newItem(ctx(), state.templateId, p.title, { quantity: p.quantity, category: chosen || guessCategory(p.title) || 'other' }));
+    }
     render('form[data-form="add-template-item"] [name="text"]');
   },
   'create-household': async (f) => {
@@ -713,6 +735,31 @@ addEventListener('online', () => scheduleSync(0));
 setInterval(() => scheduleSync(0), 60000);
 setInterval(() => refreshFeeds(), FEED_TTL);
 
+// ---- Daten schützen und Hinweise ----------------------------------------------------
+
+let installPrompt = null; // Chrome/Android: Installieren-Dialog für später
+addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; if (store) render(); });
+addEventListener('appinstalled', () => { installPrompt = null; if (store) render(); });
+
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const ios = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+let hintMeta = { installDismissed: false, backupLater: '' };
+
+/** Ob „heute“ zum Installieren oder Sichern rät. Sicherung: nur ohne Server, ab 10 Einträgen, monatlich, „später“ hält zwei Wochen. */
+function updateHints() {
+  state.installHint = standalone() || hintMeta.installDismissed ? '' : installPrompt ? 'prompt' : ios() ? 'ios' : '';
+  const count = COLLECTIONS.reduce((n, c) => n + alive(state.data[c]).length, 0);
+  state.backupDue = !state.session && count >= 10
+    && (!state.lastExport || state.lastExport < addDays(state.today, -30))
+    && (!hintMeta.backupLater || hintMeta.backupLater < addDays(state.today, -14));
+}
+
+/** Den Browser bitten, die Einträge nicht bei Platzmangel oder nach längerer Pause zu löschen. */
+async function keepData() {
+  try { if (navigator.storage?.persist && !(await navigator.storage.persisted())) await navigator.storage.persist(); } catch { /* nicht unterstützt */ }
+}
+
 // ---- Start -----------------------------------------------------------------------
 
 async function start() {
@@ -730,13 +777,24 @@ async function start() {
   // Erster Start: noch nichts gespeichert (Version 1 hatte schon Listen, dann keine Einrichtung).
   if (!savedSettings && !state.session && state.data.lists.length === 0) await store.setMeta('setupPending', true);
   state.setup = (await store.getMeta('setupPending')) === true;
+  hintMeta = { ...hintMeta, ...((await store.getMeta('hints')) || {}) };
   await ensureLists();
+  if (sessionStorage.getItem('hm-updated')) { sessionStorage.removeItem('hm-updated'); flash(MSG.newVersion); }
   render();
+  keepData();
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     // Neue Version: sobald der neue Service Worker übernimmt, einmal neu laden. Beim Zurückkehren nach Updates schauen.
     const hadController = !!navigator.serviceWorker.controller;
     let reloaded = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloaded) return;
+      reloaded = true;
+      const reload = () => { try { sessionStorage.setItem('hm-updated', '1'); } catch { /* privat */ } location.reload(); };
+      // Wer gerade tippt, verliert nichts: dann erst neu laden, wenn die App im Hintergrund ist.
+      const typing = document.activeElement?.matches?.('input, textarea') && document.activeElement.value;
+      if (!typing) { reload(); return; }
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') reload(); });
+    });
     navigator.serviceWorker.register('sw.js').then((reg) => {
       document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
     }).catch(() => {});

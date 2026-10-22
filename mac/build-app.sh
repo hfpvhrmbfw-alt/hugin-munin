@@ -19,7 +19,7 @@ cp "$REPO/mac/app/.build/arm64-apple-macosx/release/HuginMunin" "$APP/Contents/M
   go build -trimpath -ldflags "-s -w -X main.Version=$VERSION" -o "$RES/server/hm-server" .)
 
 # App, Migrationen, Hooks – dieselben Dateien wie server/install.sh
-cp -R "$REPO/index.html" "$REPO/styles.css" "$REPO/sw.js" "$REPO/manifest.webmanifest" "$REPO/src" "$REPO/icons" "$RES/server/pb_public/"
+cp -R "$REPO/index.html" "$REPO/styles.css" "$REPO/sw.js" "$REPO/manifest.webmanifest" "$REPO/src" "$REPO/icons" "$REPO/fonts" "$RES/server/pb_public/"
 cp -R "$REPO/server/pb_migrations" "$REPO/server/pb_hooks" "$RES/server/"
 
 sed "s/__VERSION__/$VERSION/g" "$REPO/mac/app/Info.plist" > "$APP/Contents/Info.plist"

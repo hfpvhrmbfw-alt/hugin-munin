@@ -4,7 +4,7 @@ import { SHOPPING_CATEGORIES, REPEATS, MODULES, STORAGE_MODES, MEAL_SLOTS, CHORE
 import {
   groupShopping, sortTasks, itemsOf, overview, agenda, addDays, alive, tabLayout, addressFields, choreState, balances,
   settleUp, monthTotal, upcomingBirthdays, nextBirthday, mealWeek, pinnedNotes, visibleGifts, progress, weekStart,
-  shoppingHistory, search,
+  shoppingHistory, search, monthGrid,
 } from './logic.js';
 import {
   APP_NAME, TABS, CATEGORY, REPEAT, REPEAT_EVERY, THEME, SYNC, MSG, MODULE, STORAGE, MEAL_SLOT, CHORE_UNIT, GIFT_STATUS, AREA, RAVEN,
@@ -29,6 +29,13 @@ export function dayLabel(iso, today, long = false) {
   if (iso === addDays(today, 1)) return 'morgen';
   if (iso === addDays(today, -1)) return 'gestern';
   return (long ? fmtDay : fmtShort).format(asDate(iso));
+}
+
+/** Überschrift eines Tages: immer mit Datum, „heute“/„morgen“/„gestern“ davor und heute hervorgehoben. */
+export function dayHead(iso, today) {
+  const date = fmtDay.format(asDate(iso));
+  const rel = [addDays(today, -1), today, addDays(today, 1)].indexOf(iso);
+  return `<h2 class="cap group${rel === 1 ? ' is-today' : ''}">${rel < 0 ? esc(date) : `${['gestern', 'heute', 'morgen'][rel]} · ${esc(date)}`}</h2>`;
 }
 
 const memberName = (state, id) => state.members.find((m) => m.id === id)?.name || '';
@@ -199,7 +206,7 @@ function renderToday(state) {
   const evOf = (occ) => state.events.find((e) => e.id === occ.eventId);
   const next = plan ? plan.events.find((occ) => { const ev = evOf(occ); return ev.startTime && (ev.endTime || ev.startTime) >= now; }) : null;
   const todayRows = plan ? plan.events.map((e) => eventLine(state, e, state.today, e === next)).join('') + plan.tasks.map((id) => taskLine(state, byId.get(id), state.today)).join('') : '';
-  const week = o.week.map((d) => `<div class="day">${group(dayLabel(d.date, state.today, true))}
+  const week = o.week.map((d) => `<div class="day">${dayHead(d.date, state.today)}
     ${d.events.map((e) => eventLine(state, e, state.today)).join('')}${d.tasks.map((id) => taskLine(state, byId.get(id), state.today)).join('')}</div>`).join('');
   const meta = [
     esc(fmtDay.format(asDate(state.today))),
@@ -208,14 +215,43 @@ function renderToday(state) {
   ].filter(Boolean).join(sep);
   const hasPlan = on(state, 'calendar') || on(state, 'tasks');
   const extras = todayMeals(state) + todayChores(state);
+  const open = on(state, 'tasks') ? todayOpen(state) : '';
+  // Pinnwand oben nur, wenn etwas dranhängt; das leere Eingabefeld steht unten.
+  const pins = on(state, 'board') && pinnedNotes(state.data.notes).length > 0;
   return `
   <h1 class="bigtitle">heute</h1>
   <p class="meta-line">${meta}</p>
-  ${on(state, 'board') ? todayBoard(state) : ''}
+  ${todayHints(state)}
+  ${pins ? todayBoard(state) : ''}
   ${o.overdue.length ? `<section class="section">${group('überfällig')}${o.overdue.map((id) => taskLine(state, byId.get(id), state.today)).join('')}</section>` : ''}
-  ${hasPlan || on(state, 'meals') || on(state, 'chores') ? `<section class="section">${group('heute')}${extras}${todayRows || (extras ? '' : emptyState('today', MSG.nothingToday))}</section>` : ''}
+  ${hasPlan || on(state, 'meals') || on(state, 'chores') ? `<section class="section">${group('heute')}${extras}${todayRows || (extras || open ? `<p class="empty">${esc(MSG.nothingToday)}</p>` : emptyState('today', MSG.nothingToday))}</section>` : ''}
+  ${open}
   ${on(state, 'contacts') ? todayBirthdays(state) : ''}
-  ${hasPlan ? `<section class="section"><h2 class="head2">diese woche</h2>${week || `<p class="empty">${esc(MSG.nothingWeek)}</p>`}</section>` : ''}`;
+  ${hasPlan ? `<section class="section"><h2 class="head2">diese woche</h2>${week || `<p class="empty">${esc(MSG.nothingWeek)}</p>`}</section>` : ''}
+  ${on(state, 'board') && !pins ? todayBoard(state) : ''}`;
+}
+
+/** Offene Aufgaben ohne Datum, damit sie auf „heute“ nicht untergehen. Wichtige zuerst, höchstens fünf. */
+function todayOpen(state) {
+  const lists = new Set(alive(state.data.lists).filter((l) => l.kind === 'tasks' && !l.archived).map((l) => l.id));
+  const open = sortTasks(state.data.items.filter((i) => lists.has(i.list) && !i.done && !i.dueDate));
+  if (!open.length) return '';
+  const more = open.length > 5 ? `<button type="button" class="item more-link" data-action="tab" data-tab="tasks"><span class="t"><span>${esc(MSG.moreTasks(open.length - 5))}</span></span>${icon('next')}</button>` : '';
+  return `<section class="section">${group('offen, ohne datum')}${open.slice(0, 5).map((i) => taskLine(state, i, state.today)).join('')}${more}</section>`;
+}
+
+/** Hinweise oben auf „heute“: App auf den Home-Bildschirm holen, Sicherung fällig. */
+function todayHints(state) {
+  const hints = [];
+  if (state.installHint) {
+    const how = state.installHint === 'ios' ? MSG.installIos : MSG.installOther;
+    const btn = state.installHint === 'prompt' ? '<button class="btn small primary" type="button" data-action="install">Installieren</button>' : '';
+    hints.push(`<div class="note info hint"><span class="cap">tipp</span><p>${esc(how)}</p><div class="actions-row">${btn}<button class="btn small" type="button" data-action="dismiss-hint" data-hint="install">Verstanden</button></div></div>`);
+  }
+  if (state.backupDue) {
+    hints.push(`<div class="note hint"><span class="cap">sicherung</span><p>${esc(state.lastExport ? MSG.backupDue : MSG.backupNever)}</p><div class="actions-row"><button class="btn small primary" type="button" data-action="export">Jetzt sichern</button><button class="btn small" type="button" data-action="dismiss-hint" data-hint="backup">Später</button></div></div>`);
+  }
+  return hints.join('');
 }
 
 function todayBoard(state) {
@@ -284,13 +320,16 @@ function renderShopping(state) {
   <p class="meta-line">${open} offen${g.done.length ? `${sep}${g.done.length} erledigt` : ''}</p>
   <form class="search" data-form="add-shopping">
     <input name="text" autocomplete="off" list="shop-suggest" aria-label="Hinzufügen" placeholder="2 Milch, Brot, Äpfel" enterkeyhint="done">
-    <select name="category" aria-label="Bereich">${SHOPPING_CATEGORIES.map((c) => `<option value="${c}" ${c === state.lastCategory ? 'selected' : ''}>${esc(CATEGORY[c])}</option>`).join('')}</select>
+    ${categorySelect()}
     <button class="iconbtn" type="submit" aria-label="Dazu" title="Dazu">${icon('plus')}</button></form>
   <datalist id="shop-suggest">${suggest.map((t) => `<option value="${attr(t)}">`).join('')}</datalist>
   ${groups ? `${groups}<div class="list-end">${mini('schaut')}</div>` : emptyState('shopping', MSG.emptyList)}
   ${g.done.length ? doneBlock(list.id, g.done.map((i) => shopRow(state, i))) : ''}
   ${templatePicker(state, list.id)}`;
 }
+
+/** Bereich beim Hinzufügen: „automatisch“ rät aus dem Namen und merkt sich, was ihr umsortiert habt. */
+const categorySelect = () => `<select name="category" aria-label="Bereich"><option value="">auto</option>${SHOPPING_CATEGORIES.map((c) => `<option value="${c}">${esc(CATEGORY[c])}</option>`).join('')}</select>`;
 
 function shopRow(state, i) {
   const editing = state.editing === i.id;
@@ -353,17 +392,44 @@ function taskRow(state, i) {
 // ---- Kalender ------------------------------------------------------------------
 
 function renderCalendar(state) {
+  const month = state.calView === 'month';
+  const editing = state.editing && state.data.events.find((e) => e.id === state.editing);
+  const eventRow = (occ) => { const p = eventParts(state, occ, state.today); return p.ev.feed ? `<div class="item feed">${p.inner}</div>` : `<button type="button" class="item" data-action="edit-event" data-id="${p.ev.id}">${p.inner}</button>`; };
+  const views = `<div class="seg" role="group" aria-label="Ansicht">${[['list', 'liste'], ['month', 'monat']].map(([v, label]) =>
+    `<button type="button" class="btn small" data-action="cal-view" data-view="${v}" aria-pressed="${(state.calView || 'list') === v}">${label}</button>`).join('')}</div>`;
+  if (month) {
+    const g = monthGrid(state.today, state.calOffset);
+    const byDay = new Map(agenda({ ...state.data, events: state.events, items: [] }, g.days[0], g.days.at(-1)).map((d) => [d.date, d]));
+    const pick = state.calDay && state.calDay.startsWith(g.month) ? state.calDay : state.today.startsWith(g.month) ? state.today : `${g.month}-01`;
+    const cells = g.days.map((d) => {
+      const n = byDay.get(d)?.events.length || 0;
+      const label = `${fmtDay.format(asDate(d))}${n ? `, ${n} ${n === 1 ? 'termin' : 'termine'}` : ''}`;
+      return `<button type="button" class="mday${d.startsWith(g.month) ? '' : ' out'}${d === state.today ? ' is-today' : ''}" data-action="cal-day" data-date="${d}" aria-pressed="${d === pick}" aria-label="${attr(label)}">
+        <span>${Number(d.slice(8))}</span><i>${'<b></b>'.repeat(Math.min(n, 3))}</i></button>`;
+    }).join('');
+    const sel = byDay.get(pick);
+    return `
+  <h1 class="bigtitle">Kalender</h1>
+  <div class="calbar">${iconBtn('back', 'Monat zurück', 'data-action="cal-move" data-step="-1"')}
+    <span class="cap">${esc(fmtMonth.format(asDate(`${g.month}-01`)))}</span>
+    ${iconBtn('next', 'Monat weiter', 'data-action="cal-move" data-step="1"')}</div>
+  ${views}
+  <div class="month"><div class="wdays" aria-hidden="true">${['mo', 'di', 'mi', 'do', 'fr', 'sa', 'so'].map((x) => `<span>${x}</span>`).join('')}</div><div class="mgrid">${cells}</div></div>
+  <section class="section">${dayHead(pick, state.today)}${sel ? sel.events.map(eventRow).join('') : `<p class="empty small">${esc(MSG.noEventsDay)}</p>`}</section>
+  ${eventForm(state, editing || null, pick)}
+  ${feedSection(state)}`;
+  }
   const from = addDays(state.today, state.calOffset * 28);
   const to = addDays(from, 27);
   const days = agenda({ ...state.data, events: state.events, items: [] }, from, to);
-  const editing = state.editing && state.data.events.find((e) => e.id === state.editing);
-  const list = days.map((d) => `<div class="day">${group(dayLabel(d.date, state.today, true))}
-    ${d.events.map((occ) => { const p = eventParts(state, occ, state.today); return p.ev.feed ? `<div class="item feed">${p.inner}</div>` : `<button type="button" class="item" data-action="edit-event" data-id="${p.ev.id}">${p.inner}</button>`; }).join('')}</div>`).join('');
+  const list = days.map((d) => `<div class="day">${dayHead(d.date, state.today)}
+    ${d.events.map(eventRow).join('')}</div>`).join('');
   return `
   <h1 class="bigtitle">Kalender</h1>
   <div class="calbar">${iconBtn('back', 'Vier Wochen zurück', 'data-action="cal-move" data-step="-1"')}
     <span class="cap">${esc(fmtRange.format(asDate(from)))} – ${esc(fmtRange.format(asDate(to)))}</span>
     ${iconBtn('next', 'Vier Wochen weiter', 'data-action="cal-move" data-step="1"')}</div>
+  ${views}
   ${eventForm(state, editing || null)}
   <section class="section">${list || emptyState('calendar', MSG.noEvents)}</section>
   ${feedSection(state)}`;
@@ -388,8 +454,8 @@ function feedSection(state) {
         ${cals.length ? '<button class="btn" type="button" data-action="reload-feeds">Neu laden</button>' : ''}</div></form></div></details>`;
 }
 
-function eventForm(state, ev) {
-  const v = ev || { title: '', startDate: state.today, endDate: state.today, startTime: null, endTime: null, repeat: 'none', repeatInterval: 1, repeatUntil: null, notes: null, people: [] };
+function eventForm(state, ev, day = state.today) {
+  const v = ev || { title: '', startDate: day, endDate: day, startTime: null, endTime: null, repeat: 'none', repeatInterval: 1, repeatUntil: null, notes: null, people: [] };
   const people = state.members.map((m) => `<label class="check inline"><input type="checkbox" name="people" value="${m.id}" ${v.people.includes(m.id) ? 'checked' : ''}><span class="t"><b>${esc(m.name || 'ohne Namen')}</b></span></label>`).join('');
   return `<details ${ev ? 'open' : ''} class="event-form"><summary>${ev ? 'termin ändern' : 'neuer termin'}</summary><div>
   <form class="editor" data-form="save-event" data-id="${ev ? ev.id : ''}">
@@ -414,7 +480,7 @@ function renderMeals(state) {
   const monday = addDays(weekStart(state.today), state.mealOffset * 7);
   const week = mealWeek(state.data.meals, monday);
   const byId = new Map(state.data.meals.map((m) => [m.id, m]));
-  const days = week.map((d) => `<div class="day">${group(dayLabel(d.date, state.today, true))}
+  const days = week.map((d) => `<div class="day">${dayHead(d.date, state.today)}
     ${d.meals.map((id) => { const m = byId.get(id); return `<div class="item"><span class="t"><b>${esc(m.title)}</b>${m.note ? `<span>${esc(m.note)}</span>` : ''}</span>
       <span class="tag">${esc(MEAL_SLOT[m.slot])}</span>${iconBtn('close', 'Entfernen', `data-action="delete" data-collection="meals" data-id="${m.id}"`)}</div>`; }).join('')
       || `<p class="empty small">${esc(MSG.noMeals)}</p>`}</div>`).join('');
@@ -451,8 +517,8 @@ function renderChores(state) {
   return `
   <h1 class="bigtitle">Haushalt</h1>
   <p class="meta-line">im wechsel${sep}wer dran ist, steht auch auf „heute“</p>
-  <section class="section">${rows || emptyState('tasks', MSG.noChores)}</section>
-  <details ${chores.length ? '' : 'open'}><summary>neue aufgabe im plan</summary><div>${choreForm(state, null)}</div></details>`;
+  <details><summary>neue aufgabe im plan</summary><div>${choreForm(state, null)}</div></details>
+  <section class="section">${rows || emptyState('tasks', MSG.noChores)}</section>`;
 }
 
 function choreForm(state, c) {
@@ -491,8 +557,8 @@ function renderExpenses(state) {
   return `
   <h1 class="bigtitle">Ausgaben</h1>
   <p class="meta-line">${esc(fmtMonth.format(asDate(month + '-01')))}${sep}${esc(money(monthTotal(exps, month)))}</p>
-  <section class="section">${group('wer schuldet wem')}${settle}</section>
   <details><summary>neue ausgabe</summary><div>${expenseForm(state)}</div></details>
+  <section class="section">${group('wer schuldet wem')}${settle}</section>
   ${list}`;
 }
 
@@ -562,7 +628,7 @@ function renderNotes(state) {
       ${n.title && n.body ? `<span>${esc(n.body.split('\n')[0])}</span>` : ''}</span>${n.pinned && on(state, 'board') ? '<span class="tag">pinnwand</span>' : ''}</button>`)).join('');
   return `
   <h1 class="bigtitle">Notizen</h1>
-  <details ${notes.length ? '' : 'open'}><summary>neue notiz</summary><div>${noteForm(state, null)}</div></details>
+  <details><summary>neue notiz</summary><div>${noteForm(state, null)}</div></details>
   <section class="section">${rows || emptyState('notes', MSG.noNotes)}</section>`;
 }
 
@@ -593,7 +659,7 @@ function renderContacts(state) {
   return `
   <h1 class="bigtitle">Kontakte</h1>
   ${soon.length ? `<section class="section">${group('nächste geburtstage')}${soon.map((b) => birthdayLine(state, byId.get(b.contactId), b)).join('')}</section>` : ''}
-  <details ${contacts.length ? '' : 'open'}><summary>neuer kontakt</summary><div>${contactForm(state, null)}</div></details>
+  <details><summary>neuer kontakt</summary><div>${contactForm(state, null)}</div></details>
   <section class="section">${group('alle')}${rows || emptyState('contacts', MSG.noContacts)}</section>`;
 }
 
@@ -627,13 +693,14 @@ function renderGifts(state) {
       ${iconBtn('close', 'Löschen', `data-action="delete" data-collection="gifts" data-id="${g.id}"`)}</div>`).join('')}</section>`).join('');
   return `
   <h1 class="bigtitle">Geschenke</h1>
+  <details><summary>neue idee</summary><div>
   <form class="editor" data-form="add-gift">
     <div class="pair"><label class="field"><span class="cap">für</span><input name="forName" list="gift-names" autocomplete="off" required></label>
       <label class="field"><span class="cap">idee</span><input name="title" required></label></div>
     ${names.length ? `<datalist id="gift-names">${names.map((n) => `<option value="${attr(n)}">`).join('')}</datalist>` : ''}
     <label class="field"><span class="cap">link oder notiz</span><input name="extra" autocomplete="off"></label>
     <label class="check inline"><input type="checkbox" name="private" checked><span class="t"><b>nur für mich sichtbar</b></span></label>
-    <div class="actions"><button class="btn primary" type="submit">Merken</button></div></form>
+    <div class="actions"><button class="btn primary" type="submit">Merken</button></div></form></div></details>
   ${list || emptyState('gifts', MSG.noGifts)}`;
 }
 
@@ -651,7 +718,7 @@ function renderTemplates(state) {
   <p class="meta-line">vorlage${sep}${items.length} einträge</p>
   <form class="search" data-form="add-template-item">
     <input name="text" autocomplete="off" aria-label="Hinzufügen" placeholder="Milch, 6 Eier, Brot" required>
-    <select name="category" aria-label="Bereich">${SHOPPING_CATEGORIES.map((c) => `<option value="${c}" ${c === state.lastCategory ? 'selected' : ''}>${esc(CATEGORY[c])}</option>`).join('')}</select>
+    ${categorySelect()}
     <button class="iconbtn" type="submit" aria-label="Dazu" title="Dazu">${icon('plus')}</button></form>
   <section class="section">${items.map((i) => `<div class="item"><span class="t"><b>${i.quantity ? `<span class="fill">${esc(i.quantity)}</span> ` : ''}${esc(i.title)}</b><span>${esc(i.category ? CATEGORY[i.category] : '')}</span></span>
     ${iconBtn('close', 'Entfernen', `data-action="delete-item" data-id="${i.id}"`)}</div>`).join('') || `<p class="empty">${esc(MSG.emptyList)}</p>`}</section>
@@ -666,11 +733,17 @@ function renderTemplates(state) {
  * Auswahl des Speicherorts mit den passenden Feldern. Felder anderer Speicherorte sind ausgeblendet
  * und abgeschaltet, damit nur die gewählten abgeschickt werden.
  */
+const COMMON_STORAGE = ['local', 'tailscale'];
+
 function storageFields(state, mode, setup = false) {
   const f = addressFields(mode, state.settings.serverUrl || state.defaultServer);
   const showIf = (modes) => (modes.split(' ').includes(mode) ? '' : 'hidden disabled');
-  const radios = STORAGE_MODES.map((m) => `<label class="choice"><input type="radio" name="storage" value="${m}" data-action="pick-storage" ${m === mode ? 'checked' : ''}>
-    <span class="t"><b>${esc(STORAGE[m][0])}</b><span>${esc(STORAGE[m][1])}</span></span></label>`).join('');
+  // Die zwei üblichen Wege stehen offen da, die übrigen eingeklappt (für Bastler).
+  const radio = (m) => `<label class="choice"><input type="radio" name="storage" value="${m}" data-action="pick-storage" ${m === mode ? 'checked' : ''}>
+    <span class="t"><b>${esc(STORAGE[m][0])}</b><span>${esc(STORAGE[m][1])}</span></span></label>`;
+  const rare = STORAGE_MODES.filter((m) => !COMMON_STORAGE.includes(m));
+  const radios = COMMON_STORAGE.map(radio).join('')
+    + `<details class="other-ways"${rare.includes(mode) ? ' open' : ''}><summary>andere wege</summary><div>${rare.map(radio).join('')}</div></details>`;
   const port = (v) => `<label class="field"><span class="cap">port</span><input name="port" inputmode="numeric" value="${attr(v)}" placeholder="${DEFAULT_PORT}"></label>`;
   const mixed = state.pageProtocol === 'https:' ? `<div class="note"><span class="cap">achtung</span>${esc(MSG.mixedContent)}</div>` : '';
   return `<fieldset class="choices"><legend class="cap">wo sollen eure daten liegen?</legend>${radios}</fieldset>
@@ -739,8 +812,10 @@ function renderMore(state) {
        ${!s.household ? householdForms() : `<details><summary>anderem haushalt beitreten</summary><div>${joinForm()}</div></details>`}
        <div class="actions-row"><button class="btn" type="button" data-action="sync-now">Jetzt abgleichen</button>
           <button class="btn quiet" type="button" data-action="logout">Abmelden / Speicherort wechseln</button></div>`
-    : `<form class="editor" data-form="login">${storageFields(state, state.setupMode)}
-       <div data-modes="local" class="fields" ${state.setupMode === 'local' ? '' : 'hidden'}><p class="empty">Alles bleibt auf diesem Gerät. Zum Teilen mit dem Partner meldet ihr euch beide am selben Server an.</p></div></form>`;
+    : `${infoRow('speicherort', esc(STORAGE.local[0]))}
+       <details${state.setupMode !== 'local' ? ' open' : ''}><summary>mit partner teilen / speicherort ändern</summary><div>
+       <form class="editor" data-form="login">${storageFields(state, state.setupMode)}
+       <div data-modes="local" class="fields" ${state.setupMode === 'local' ? '' : 'hidden'}><p class="empty">Alles bleibt auf diesem Gerät. Zum Teilen mit dem Partner meldet ihr euch beide am selben Server an.</p></div></form></div></details>`;
   return `
   <h1 class="bigtitle">Mehr</h1>
   ${extra.length ? `<section class="section">${group('bereiche')}${extra.map((m) => `<button type="button" class="item" data-action="tab" data-tab="${m}">

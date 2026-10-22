@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   dayNumber, isoFromDay, addDays, weekday, weekStart, occurrences, groupShopping, sortTasks,
-  splitQuickAdd, agenda, overview, pickWinner, mergeRemote, nextCursor,
+  splitQuickAdd, agenda, overview, pickWinner, mergeRemote, nextCursor, guessCategory, monthGrid,
 } from '../src/logic.js';
 import { sanitizeEvent, sanitizeItem, sanitizeList } from '../src/model.js';
 
@@ -121,4 +121,26 @@ test('Abgleich: mergeRemote übernimmt Neueres und behält eigene neuere Änderu
 test('Abgleich: Merker wandert nur vorwärts', () => {
   assert.equal(nextCursor('', [{ updated: '2026-10-19 10:00:00.000Z' }, { updated: '2026-10-19 09:00:00.000Z' }]), '2026-10-19 10:00:00.000Z');
   assert.equal(nextCursor('2026-10-20 00:00:00.000Z', [{ updated: '2026-10-19 10:00:00.000Z' }]), '2026-10-20 00:00:00.000Z');
+});
+
+test('Einkauf: Bereich im Laden aus dem Namen raten', () => {
+  const cases = {
+    Milch: 'dairy', 'Bio-Milch': 'dairy', Käse: 'dairy', Brot: 'bakery', Vollkornbrot: 'bakery', Käsekuchen: 'bakery',
+    Äpfel: 'produce', Gurke: 'produce', Rinderhack: 'meat', Reis: 'pantry', Eis: 'frozen', Mineralwasser: 'drinks',
+    Spülmittel: 'household', Toilettenpapier: 'household', Zahnpasta: 'care',
+  };
+  for (const [title, cat] of Object.entries(cases)) assert.equal(guessCategory(title), cat, title);
+  assert.equal(guessCategory('Schrauben'), null);
+  assert.equal(guessCategory('Preiselbeeren'), 'produce'); // längstes passendes Wortende gewinnt (nicht „reis“)
+});
+
+test('Kalender: Monatsblick in ganzen Wochen', () => {
+  const okt = monthGrid('2026-10-22');
+  assert.equal(okt.month, '2026-10');
+  assert.equal(okt.days[0], '2026-09-28');
+  assert.equal(okt.days.at(-1), '2026-11-01');
+  assert.equal(okt.days.length, 35);
+  const nov = monthGrid('2026-10-22', 1);
+  assert.equal(nov.days.length, 42);
+  assert.equal(monthGrid('2026-01-15', -1).month, '2025-12');
 });

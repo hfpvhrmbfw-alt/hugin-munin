@@ -107,6 +107,21 @@ export function groupShopping(items) {
   return { open: groups, done };
 }
 
+/**
+ * Tage für die Monatsansicht: ganze Wochen (Montag bis Sonntag) rund um den Monat.
+ * @param {string} today YYYY-MM-DD
+ * @param {number} offset Monate von heute aus (−1 = Vormonat)
+ * @returns {{month:string, days:string[]}} month als YYYY-MM, days 35 oder 42 Tage
+ */
+export function monthGrid(today, offset = 0) {
+  const d = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1 + offset, 1));
+  const month = d.toISOString().slice(0, 7);
+  const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+  const days = [];
+  for (let x = weekStart(`${month}-01`); x <= last || days.length % 7; x = addDays(x, 1)) days.push(x);
+  return { month, days };
+}
+
 /** Aufgaben sortiert: offen vor erledigt, wichtig zuerst, nach Fälligkeit (ohne Datum zuletzt), dann Reihenfolge. */
 export function sortTasks(items) {
   return [...items].filter((i) => !i.deleted).sort((a, b) =>
@@ -123,6 +138,34 @@ export function splitQuickAdd(text) {
     const m = s.match(/^(\d+(?:[.,]\d+)?\s*(?:x|stk|g|kg|ml|l|pck|dose|bund)?\.?)\s+(.+)$/i);
     return m ? { title: m[2], quantity: m[1].trim() } : { title: s, quantity: null };
   });
+}
+
+/** Wörter, an denen man den Bereich im Laden erkennt. Ohne Umlaute (siehe fold); zusammengesetzte Wörter zählen über ihr Ende. */
+const CATEGORY_WORDS = {
+  produce: 'obst gemuse apfel apfeln banane bananen birne birnen orange orangen mandarine mandarinen zitrone zitronen limette limetten traube trauben beere beeren erdbeeren himbeeren heidelbeeren kiwi mango ananas melone avocado avocados tomate tomaten gurke gurken salat paprika zwiebel zwiebeln knoblauch kartoffel kartoffeln mohre mohren karotte karotten zucchini aubergine brokkoli blumenkohl kohl lauch porree spinat pilze champignons ingwer petersilie basilikum schnittlauch kraut kurbis radieschen sellerie fenchel spargel rucola',
+  bakery: 'brot brote brotchen semmel semmeln weckle toast baguette brezel brezeln croissant croissants kuchen torte zwieback knackebrot',
+  dairy: 'milch butter kase joghurt jogurt quark sahne schmand frischkase mozzarella parmesan gouda feta eier skyr kefir buttermilch margarine',
+  meat: 'fleisch hack hackfleisch wurst wurstchen salami schinken speck hahnchen huhn pute steak schnitzel bratwurst lachs fisch thunfisch garnelen aufschnitt',
+  frozen: 'tiefkuhl pizza eis pommes fischstabchen tk',
+  pantry: 'nudeln spaghetti reis mehl zucker salz pfeffer ol essig apfelmus musli haferflocken cornflakes honig marmelade nutella senf ketchup mayo bruhe konserve dose bohnen linsen kichererbsen tomatenmark passata gewurz backpulver hefe kaffee tee kakao schokolade kekse chips nusse mandeln',
+  drinks: 'wasser sprudel saft apfelschorle schorle cola limo limonade bier wein sekt',
+  household: 'spulmittel spultabs tabs waschmittel weichspuler mullbeutel mulltuten klopapier toilettenpapier kuchenrolle kuchenpapier kuchentucher taschentucher schwamm schwamme alufolie frischhaltefolie backpapier batterien gluhbirne putzmittel reiniger entkalker servietten kerzen',
+  care: 'zahnpasta zahnburste shampoo duschgel seife deo creme sonnencreme rasierer windeln feuchttucher binden tampons wattepads pflaster',
+};
+const CATEGORY_INDEX = Object.entries(CATEGORY_WORDS)
+  .flatMap(([cat, words]) => words.split(' ').map((w) => [w, cat]))
+  .sort((a, b) => b[0].length - a[0].length);
+
+/**
+ * Bereich im Laden aus dem Namen raten ("Vollkornbrot" → Brot, "Bio-Milch" → Milch). Kurze Wörter zählen nur ganz.
+ * @returns {string|null} Kategorie oder null, wenn nichts passt
+ */
+export function guessCategory(title) {
+  const words = fold(title).split(/[^a-z0-9]+/).filter(Boolean);
+  for (const [w, cat] of CATEGORY_INDEX) {
+    if (words.some((x) => x === w || (w.length >= 4 && x.endsWith(w)))) return cat;
+  }
+  return null;
 }
 
 // ---- Überblick ---------------------------------------------------------------

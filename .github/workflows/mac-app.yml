@@ -2,7 +2,7 @@ name: Mac-App
 
 on:
   push:
-    paths: ["mac/**", "server/**", "src/**", "index.html", "styles.css", "sw.js", ".github/workflows/mac-app.yml"]
+    paths: ["mac/**", "server/**", "src/**", "index.html", "styles.css", "fonts/**", "sw.js", ".github/workflows/mac-app.yml"]
   pull_request:
     paths: ["mac/**", "server/**", ".github/workflows/mac-app.yml"]
   workflow_dispatch:

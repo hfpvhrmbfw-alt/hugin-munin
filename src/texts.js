@@ -40,7 +40,7 @@ export const MODULE = {
 /** Speicherorte: Name und Hinweis. */
 export const STORAGE = {
   local: ['nur auf diesem gerät', 'Kein Server, kein Konto. Teilen mit dem Partner geht dann nicht, eine Sicherung als Datei schon.'],
-  tailscale: ['eigener server über tailscale', 'Der Mac mini zu Hause, von überall erreichbar über die Tailscale-App. Empfohlen.'],
+  tailscale: ['unser mac mini zu hause', 'Gemeinsam mit dem Partner, von überall erreichbar über die Tailscale-App. Empfohlen.'],
   wireguard: ['eigener server über wireguard', 'Der Mac mini über einen eigenen WireGuard-Tunnel (z. B. von der FritzBox). Die WireGuard-App muss an sein.'],
   lan: ['eigener server im heimnetz', 'Nur im WLAN zu Hause erreichbar. Unterwegs speichert die App und gleicht später ab.'],
   domain: ['eigener server mit eigener adresse', 'Der Mac mini unter einer eigenen Domain mit HTTPS, z. B. über Cloudflare Tunnel.'],
@@ -104,6 +104,7 @@ export const MSG = {
   settled: 'Alles ausgeglichen.',
   noChores: 'Noch nichts im Plan, z. B. Bad putzen, Müll rausbringen.',
   noMeals: 'noch nichts geplant',
+  noEventsDay: 'Keine Termine an diesem Tag.',
   noNotes: 'Noch keine Notizen.',
   noContacts: 'Noch keine Kontakte.',
   noGifts: 'Noch keine Ideen.',
@@ -118,6 +119,13 @@ export const MSG = {
   shoppingOpen: (n) => (n === 0 ? 'Einkaufsliste leer' : n === 1 ? '1 Sache einzukaufen' : `${n} Sachen einzukaufen`),
   nothingToday: 'Heute steht nichts an.',
   nothingWeek: 'Die Woche ist frei.',
+  moreTasks: (n) => (n === 1 ? '1 weitere aufgabe' : `${n} weitere aufgaben`),
+  // Hinweise auf „heute“
+  installIos: 'Hol dir Hugin & Munin auf den Home-Bildschirm: unten in Safari auf „Teilen“ tippen, dann „Zum Home-Bildschirm“. So startet die App wie eine richtige App, kann Erinnerungen schicken, und Safari räumt eure Einträge nicht weg.',
+  installOther: 'Installiere Hugin & Munin als App. Dann startet sie ohne Browserleiste, und der Browser räumt eure Einträge nicht weg.',
+  backupNever: 'Eure Einträge liegen nur auf diesem Gerät. Speichere ab und zu eine Sicherung, z. B. in iCloud Drive.',
+  backupDue: 'Die letzte Sicherung ist über einen Monat her. Eure Einträge liegen nur auf diesem Gerät.',
+  newVersion: 'Neue Version geladen.',
   emptyList: 'Noch nichts auf der Liste.',
   allDone: 'Alles erledigt. Zeit für eine Pause.',
   noEvents: 'Keine Termine in den nächsten vier Wochen.',
