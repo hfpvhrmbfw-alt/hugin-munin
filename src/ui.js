@@ -62,6 +62,9 @@ function allEvents(state) {
 export const on = (state, module) => state.settings.modules.includes(module);
 
 const group = (text) => `<h2 class="cap group">${esc(text)}</h2>`;
+/** Kleine Raben-Silhouette (icons/mini-*.png), färbt sich mit der Schrift. */
+const mini = (pose) => `<span class="mini" style="--mini:url('icons/mini-${pose}.png')" aria-hidden="true"></span>`;
+const SYNC_RAVEN = { ok: 'zwei', syncing: 'fliegt', offline: 'schlaeft' };
 const sep = '<span class="sep">·</span>';
 
 // Linien-Symbole, 24er Raster, Strich aus dem Stylesheet
@@ -109,8 +112,8 @@ export function renderShell(state) {
   const syncText = !state.session ? SYNC.local
     : s.status === 'ok' ? `${SYNC.ok} ${fmtTime.format(new Date(s.at))}` : (s.message || SYNC[s.status] || '');
   return `<div class="app">
-  <header class="apphead"><div class="wrap"><h1>${esc(APP_NAME)}</h1>
-    <span class="sync cap" data-status="${attr(state.session ? s.status : 'local')}" role="status">${esc(syncText)}</span>
+  <header class="apphead"><div class="wrap"><h1>${mini('sitzt')}${esc(APP_NAME)}</h1>
+    <span class="sync cap" data-status="${attr(state.session ? s.status : 'local')}" role="status">${state.session && SYNC_RAVEN[s.status] ? mini(SYNC_RAVEN[s.status]) : ''}${esc(syncText)}</span>
     ${iconBtn('search', 'Suche', `data-action="tab" data-tab="search"${tab === 'search' ? ' aria-current="page"' : ''}`)}</div></header>
   <main class="wrap" id="main">${flashNote(state)}${renderTab(state, tab)}</main>
   ${state.undo ? `<div class="toast" role="status"><span>${esc(state.undo.text)}</span><button class="btn small" type="button" data-action="undo">rückgängig</button></div>` : ''}
@@ -219,7 +222,7 @@ function todayBoard(state) {
   const notes = pinnedNotes(state.data.notes);
   const cards = notes.map((n) => `<div class="pin"><div class="t">${n.title ? `<b>${esc(n.title)}</b>` : ''}${n.body ? `<p>${esc(n.body)}</p>` : ''}
     ${who(state, n.changedBy) || `<span class="cap">${esc(memberName(state, n.changedBy) || '')}</span>`}</div>${iconBtn('close', 'Abnehmen', `data-action="unpin" data-id="${n.id}"`)}</div>`).join('');
-  return `<section class="section board">${group('pinnwand')}${cards}
+  return `<section class="section board"><h2 class="cap group">${mini('traegt')}pinnwand</h2>${cards}
     <form class="search" data-form="add-pin"><input name="body" autocomplete="off" aria-label="Auf die Pinnwand" placeholder="Nachricht an alle" required>
     <button class="iconbtn" type="submit" aria-label="Anheften" title="Anheften">${icon('plus')}</button></form></section>`;
 }
@@ -284,7 +287,7 @@ function renderShopping(state) {
     <select name="category" aria-label="Bereich">${SHOPPING_CATEGORIES.map((c) => `<option value="${c}" ${c === state.lastCategory ? 'selected' : ''}>${esc(CATEGORY[c])}</option>`).join('')}</select>
     <button class="iconbtn" type="submit" aria-label="Dazu" title="Dazu">${icon('plus')}</button></form>
   <datalist id="shop-suggest">${suggest.map((t) => `<option value="${attr(t)}">`).join('')}</datalist>
-  ${groups || emptyState('shopping', MSG.emptyList)}
+  ${groups ? `${groups}<div class="list-end">${mini('schaut')}</div>` : emptyState('shopping', MSG.emptyList)}
   ${g.done.length ? doneBlock(list.id, g.done.map((i) => shopRow(state, i))) : ''}
   ${templatePicker(state, list.id)}`;
 }
@@ -317,7 +320,7 @@ function renderTasks(state) {
     <input name="title" autocomplete="off" aria-label="Neue Aufgabe" placeholder="Neue Aufgabe" required>
     <input name="dueDate" type="date" aria-label="Fällig">
     <button class="iconbtn" type="submit" aria-label="Dazu" title="Dazu">${icon('plus')}</button></form>
-  <section class="section">${open.map((i) => taskRow(state, i)).join('') || emptyState('tasks', done.length ? MSG.allDone : MSG.emptyList)}</section>
+  <section class="section">${open.length ? `${open.map((i) => taskRow(state, i)).join('')}<div class="list-end">${mini('schaut')}</div>` : emptyState('tasks', done.length ? MSG.allDone : MSG.emptyList)}</section>
   ${done.length ? doneBlock(list.id, done.map((i) => taskRow(state, i))) : ''}
   ${templatePicker(state, list.id)}`;
 }
@@ -704,7 +707,7 @@ function moduleChecks(state, form) {
 function renderSetup(state) {
   const mode = state.setupMode;
   return `<div class="app setup">
-  <header class="apphead"><div class="wrap"><h1>${esc(APP_NAME)}</h1><span class="sync cap">einrichtung</span></div></header>
+  <header class="apphead"><div class="wrap"><h1>${mini('sitzt')}${esc(APP_NAME)}</h1><span class="sync cap">einrichtung</span></div></header>
   <main class="wrap" id="main">${flashNote(state)}
     <h1 class="bigtitle">Willkommen</h1>
     <p class="meta-line">zwei fragen, dann geht's los.</p>

@@ -43,7 +43,7 @@ code { font:14px var(--font-label); background:var(--sunken); padding:2px 6px; b
 .app { min-height:100dvh; padding-bottom:calc(var(--tap) + 12px + env(safe-area-inset-bottom, 0px) + var(--s6)); }
 .apphead { position:sticky; top:0; z-index:20; background:var(--bg); border-bottom:1px solid var(--line); padding-top:env(safe-area-inset-top, 0px); }
 .apphead .wrap { display:flex; align-items:center; justify-content:space-between; gap:var(--s3); min-height:var(--tap); }
-.apphead h1 { font:600 17px/1.2 var(--font-title); margin:0; white-space:nowrap; }
+.apphead h1 { display:flex; align-items:center; gap:6px; font:600 17px/1.2 var(--font-title); margin:0; white-space:nowrap; }
 .sync { color:var(--muted); text-align:right; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-left:auto; }
 .apphead .iconbtn { margin-right:calc(var(--s3) * -1); }
 .apphead .iconbtn[aria-current] { color:var(--accent-text); }
@@ -234,6 +234,20 @@ button.item > svg { color:var(--faint); }
   :root:not([data-theme="light"]) .raven { --raven-edge:#E4E2DB; --raven-ink:#111111; }
   :root:not([data-theme="light"]) .raven::before { display:block; }
 }
+
+/* ---------- Mini-Raben: Silhouetten als Maske, Farbe aus der Schrift ---------- */
+.mini { display:inline-block; flex:none; width:1.35em; height:1.35em; vertical-align:-0.3em; background:currentColor;
+  -webkit-mask:var(--mini) center / contain no-repeat; mask:var(--mini) center / contain no-repeat; }
+.apphead h1 .mini { width:22px; height:22px; }
+.sync .mini { margin-right:5px; color:var(--faint); }
+.group .mini { margin-right:5px; color:var(--faint); }
+.list-end { display:flex; justify-content:center; padding:var(--s4) 0 0; color:var(--faint); font-size:22px; }
+.mini.hop { position:fixed; z-index:40; width:32px; height:32px; color:var(--ink); pointer-events:none; animation:hop .52s ease-out; }
+.mini.hop.away { animation:hop-away .5s ease-in forwards; }
+.mini.hop.still { animation:none; transition:opacity .4s; }
+.mini.hop.still.away { opacity:0; }
+@keyframes hop { 0% { opacity:0; transform:scale(.6); } 15% { opacity:1; transform:none; } 35% { transform:translateY(-9px); } 55% { transform:none; } 75% { transform:translateY(-6px); } 100% { transform:none; } }
+@keyframes hop-away { to { opacity:0; transform:translate(40px, -56px) scale(.8); } }
 
 /* ---------- Rückgängig ---------- */
 .toast { position:fixed; z-index:30; left:50%; transform:translateX(-50%); bottom:calc(var(--tap) + 24px + env(safe-area-inset-bottom, 0px));
