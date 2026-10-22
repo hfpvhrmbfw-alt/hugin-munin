@@ -221,8 +221,19 @@ button.item > svg { color:var(--faint); }
 /* ---------- Leere Seiten: Raben-Zeichnungen von Anna als Maske, Farbe aus dem Thema ---------- */
 .empty-state { display:flex; flex-direction:column; align-items:center; text-align:center; gap:var(--s3); padding:var(--s6) var(--s4) var(--s5); color:var(--muted); }
 .empty-state p { margin:0; max-width:32ch; }
-.raven { display:block; width:128px; height:128px; background:var(--muted); opacity:.9;
+/* Im Dunkeln: Zeichnung in Tinte mit klarer heller Umrandung (wie ein Aufkleber) statt invertiert. */
+.raven { display:block; position:relative; width:128px; height:128px; }
+.raven::before, .raven::after { content:""; position:absolute; inset:0; }
+.raven::before { display:none; background:var(--raven-edge, transparent);
+  -webkit-mask:var(--raven-rand) center / contain no-repeat; mask:var(--raven-rand) center / contain no-repeat; }
+.raven::after { background:var(--raven-ink, var(--ink));
   -webkit-mask:var(--raven) center / contain no-repeat; mask:var(--raven) center / contain no-repeat; }
+[data-theme="dark"] .raven { --raven-edge:#E4E2DB; --raven-ink:#111111; }
+[data-theme="dark"] .raven::before { display:block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .raven { --raven-edge:#E4E2DB; --raven-ink:#111111; }
+  :root:not([data-theme="light"]) .raven::before { display:block; }
+}
 
 /* ---------- Rückgängig ---------- */
 .toast { position:fixed; z-index:30; left:50%; transform:translateX(-50%); bottom:calc(var(--tap) + 24px + env(safe-area-inset-bottom, 0px));
