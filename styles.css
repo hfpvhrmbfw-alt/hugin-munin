@@ -238,7 +238,7 @@ button.item > svg { color:var(--faint); }
 /* ---------- Mini-Raben: Silhouetten als Maske, Farbe aus der Schrift ---------- */
 .mini { display:inline-block; flex:none; width:1.35em; height:1.35em; vertical-align:-0.3em; background:currentColor;
   -webkit-mask:var(--mini) center / contain no-repeat; mask:var(--mini) center / contain no-repeat; }
-.apphead h1 .mini { width:22px; height:22px; }
+.apphead h1 .mini { width:26px; height:26px; margin:-2px 0; }
 .sync .mini { margin-right:5px; color:var(--faint); }
 .group .mini { margin-right:5px; color:var(--faint); }
 .list-end { display:flex; justify-content:center; padding:var(--s4) 0 0; color:var(--faint); font-size:22px; }

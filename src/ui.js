@@ -112,7 +112,7 @@ export function renderShell(state) {
   const syncText = !state.session ? SYNC.local
     : s.status === 'ok' ? `${SYNC.ok} ${fmtTime.format(new Date(s.at))}` : (s.message || SYNC[s.status] || '');
   return `<div class="app">
-  <header class="apphead"><div class="wrap"><h1>${mini('sitzt')}${esc(APP_NAME)}</h1>
+  <header class="apphead"><div class="wrap"><h1>${mini('kopf')}${esc(APP_NAME)}</h1>
     <span class="sync cap" data-status="${attr(state.session ? s.status : 'local')}" role="status">${state.session && SYNC_RAVEN[s.status] ? mini(SYNC_RAVEN[s.status]) : ''}${esc(syncText)}</span>
     ${iconBtn('search', 'Suche', `data-action="tab" data-tab="search"${tab === 'search' ? ' aria-current="page"' : ''}`)}</div></header>
   <main class="wrap" id="main">${flashNote(state)}${renderTab(state, tab)}</main>
@@ -707,7 +707,7 @@ function moduleChecks(state, form) {
 function renderSetup(state) {
   const mode = state.setupMode;
   return `<div class="app setup">
-  <header class="apphead"><div class="wrap"><h1>${mini('sitzt')}${esc(APP_NAME)}</h1><span class="sync cap">einrichtung</span></div></header>
+  <header class="apphead"><div class="wrap"><h1>${mini('kopf')}${esc(APP_NAME)}</h1><span class="sync cap">einrichtung</span></div></header>
   <main class="wrap" id="main">${flashNote(state)}
     <h1 class="bigtitle">Willkommen</h1>
     <p class="meta-line">zwei fragen, dann geht's los.</p>
