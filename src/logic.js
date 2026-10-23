@@ -458,6 +458,55 @@ export function parseDayMonth(text) {
   return mo >= 1 && mo <= 12 && d >= 1 && d <= daysInMonth(2000, mo) ? `${pad(mo)}-${pad(d)}` : null;
 }
 
+const WEEKDAYS = ['montag', 'dienstag', 'mittwoch', 'donnerstag', 'freitag', 'samstag', 'sonntag'];
+const hhmm = (h, m) => (Number(h) <= 23 && Number(m || 0) <= 59 ? `${pad(Number(h))}:${pad(Number(m || 0))}` : null);
+
+/**
+ * Schnelleingabe für Termine und Aufgaben: Tag und Uhrzeit aus dem Text lesen, der Rest ist der Titel.
+ *   „Elternabend morgen 19 Uhr“, „Zahnarzt am Freitag um 8:30“, „Kino 24.12. 20-22 Uhr“, „Müll übermorgen“
+ * Wochentage meinen den nächsten (heute zählt). Ein Datum ohne Jahr, das schon vorbei ist, liegt im nächsten Jahr.
+ * @returns {{title:string, date:string|null, startTime:string|null, endTime:string|null}}
+ */
+export function parseQuickWhen(text, today) {
+  let s = ` ${String(text ?? '').replace(/\s+/g, ' ').trim()} `;
+  let date = null; let startTime = null; let endTime = null;
+  const take = (re, fn) => { s = s.replace(re, (...m) => (fn(m) === false ? m[0] : ' ')); };
+  // Uhrzeit: von–bis, dann eine einzelne. Ohne „uhr“, Doppelpunkt oder „um“ ist eine Zahl keine Uhrzeit.
+  take(/\s(?:(?:um|von|ab)\s)?(\d{1,2})(?:[:.](\d{2}))?\s?(?:-|–|bis)\s?(\d{1,2})(?:[:.](\d{2}))?(\s?uhr)?(?=[\s,.!]|$)/i, (m) => {
+    if (!m[5] && !m[2] && !m[4]) return false;
+    const a = hhmm(m[1], m[2]); const b = hhmm(m[3], m[4]);
+    if (!a || !b) return false;
+    startTime = a; endTime = b; return true;
+  });
+  if (!startTime) {
+    take(/\s(?:(um|ab)\s)?(\d{1,2})(?:([:.])(\d{2}))?(\s?uhr)?(?=[\s,!]|\.(?:\s|$)|$)/i, (m) => {
+      if (!m[1] && !m[5] && m[3] !== ':') return false;
+      const t = hhmm(m[2], m[4]);
+      if (!t) return false;
+      startTime = t; return true;
+    });
+  }
+  // Tag
+  take(/\s(?:am\s)?(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})?(?=[\s,!]|$)/i, (m) => {
+    const d = Number(m[1]); const mo = Number(m[2]);
+    let y = m[3] ? Number(m[3].length === 2 ? `20${m[3]}` : m[3]) : Number(today.slice(0, 4));
+    if (mo < 1 || mo > 12 || d < 1 || d > daysInMonth(y, mo)) return false;
+    let iso = `${y}-${pad(mo)}-${pad(d)}`;
+    if (!m[3] && iso < today) { y++; iso = `${y}-${pad(mo)}-${pad(Math.min(d, daysInMonth(y, mo)))}`; }
+    date = iso; return true;
+  });
+  if (!date) {
+    take(/\s(heute|übermorgen|morgen)(?=[\s,.!]|$)/i, (m) => { date = addDays(today, { heute: 0, morgen: 1, übermorgen: 2 }[m[1].toLowerCase()]); });
+  }
+  if (!date) {
+    take(new RegExp(`\\s(?:am\\s|nächsten\\s|kommenden\\s)?(${WEEKDAYS.join('|')})(?=[\\s,.!]|$)`, 'i'), (m) => {
+      date = addDays(today, (WEEKDAYS.indexOf(m[1].toLowerCase()) - weekday(today) + 7) % 7);
+    });
+  }
+  const title = s.replace(/\s+/g, ' ').replace(/^[\s,.-]+|[\s,-]+$/g, '').trim();
+  return { title, date, startTime, endTime };
+}
+
 /** Geburtstage in den nächsten days Tagen (heute = 0), nach Nähe sortiert. */
 export function upcomingBirthdays(contacts, today, days) {
   return contacts.map((c) => nextBirthday(c, today)).filter((b) => b && b.inDays < days)

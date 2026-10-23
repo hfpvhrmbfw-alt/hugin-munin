@@ -81,7 +81,7 @@ export const IMPORT_ERROR = {
 };
 
 export const SYNC = {
-  local: 'nur auf diesem Gerät',
+  local: 'lokal',
   syncing: 'gleicht ab …',
   ok: 'abgeglichen',
   offline: 'offline, gleicht später ab',
@@ -121,11 +121,18 @@ export const MSG = {
   nothingWeek: 'Die Woche ist frei.',
   moreTasks: (n) => (n === 1 ? '1 weitere aufgabe' : `${n} weitere aufgaben`),
   // Hinweise auf „heute“
-  installIos: 'Hol dir Hugin & Munin auf den Home-Bildschirm: unten in Safari auf „Teilen“ tippen, dann „Zum Home-Bildschirm“. So startet die App wie eine richtige App, kann Erinnerungen schicken, und Safari räumt eure Einträge nicht weg.',
-  installOther: 'Installiere Hugin & Munin als App. Dann startet sie ohne Browserleiste, und der Browser räumt eure Einträge nicht weg.',
-  backupNever: 'Eure Einträge liegen nur auf diesem Gerät. Speichere ab und zu eine Sicherung, z. B. in iCloud Drive.',
-  backupDue: 'Die letzte Sicherung ist über einen Monat her. Eure Einträge liegen nur auf diesem Gerät.',
+  installIos: 'In Safari „Teilen“ und dann „Zum Home-Bildschirm“: dann startet Hugin & Munin wie eine App, und Safari löscht nichts.',
+  installOther: 'Als App installieren: startet ohne Browserleiste, und der Browser löscht nichts.',
+  backupNever: 'Alles liegt nur auf diesem Gerät. Ab und zu eine Sicherung speichern, z. B. in iCloud Drive.',
+  backupDue: 'Letzte Sicherung vor über einem Monat. Alles liegt nur auf diesem Gerät.',
   newVersion: 'Neue Version geladen.',
+  // Schnelleingabe
+  quickShopping: (n) => (n === 1 ? 'Steht auf der Einkaufsliste.' : `${n} Sachen auf der Einkaufsliste.`),
+  quickTask: (day) => (day ? `Aufgabe für ${day} eingetragen.` : 'Aufgabe eingetragen.'),
+  quickEvent: (day, time) => `Termin ${day}${time ? ` um ${time}` : ''} eingetragen.`,
+  quickNoTitle: 'Was soll eingetragen werden? Z. B. „Elternabend morgen 19 Uhr“.',
+  needsPartner: 'Lohnt sich erst zu zweit, also mit eigenem Server.',
+  syncLocalLong: 'Alles liegt nur auf diesem Gerät. Tippen für Speicherort und Teilen.',
   emptyList: 'Noch nichts auf der Liste.',
   allDone: 'Alles erledigt. Zeit für eine Pause.',
   noEvents: 'Keine Termine in den nächsten vier Wochen.',
@@ -199,8 +206,6 @@ export const MSG = {
   pushFailed: 'Das hat nicht geklappt. Ist der Server erreichbar?',
   // Sicherung
   backupServer: 'Der Server sichert zusätzlich jede Nacht um 3 Uhr (die letzten 14 Tage).',
-  lastBackup: (d) => `Zuletzt gesichert: ${d}.`,
-  noBackupYet: 'Auf diesem Gerät noch nie gesichert.',
 };
 
 /** Fehlermeldung zu einem Abgleich- oder Server-Fehler. */
