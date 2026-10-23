@@ -84,6 +84,7 @@ const ICON = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
   back: '<path d="M15 5l-7 7 7 7"/>',
+  down: '<path d="M7 10l5 5 5-5"/>',
   next: '<path d="M9 5l7 7-7 7"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
   meals: '<circle cx="12" cy="13" r="6.5"/><path d="M3 4v5a2 2 0 0 0 2 2V20M21 4c-1.5 1-2 3-2 5s.8 2 2 2v9"/>',
@@ -118,16 +119,22 @@ export function renderShell(state) {
   const s = state.sync;
   const syncText = !state.session ? SYNC.local
     : s.status === 'ok' ? `${SYNC.ok} ${fmtTime.format(new Date(s.at))}` : (s.message || SYNC[s.status] || '');
+  // Unterseiten aus „mehr“ bekommen einen Weg zurück (Projekt-Details haben ihren eigenen).
+  const sub = layout.more.includes(tab) && !(tab === 'projects' && state.projectId);
   return `<div class="app">
   <header class="apphead"><div class="wrap"><h1>${mini('kopf')}${esc(APP_NAME)}</h1>
-    <span class="sync cap" data-status="${attr(state.session ? s.status : 'local')}" role="status">${state.session && SYNC_RAVEN[s.status] ? mini(SYNC_RAVEN[s.status]) : ''}${esc(syncText)}</span>
+    <button type="button" class="sync cap" data-action="open-storage" data-status="${attr(state.session ? s.status : 'local')}" aria-live="polite" title="${attr(state.session ? syncText : MSG.syncLocalLong)}">${state.session && SYNC_RAVEN[s.status] ? mini(SYNC_RAVEN[s.status]) : ''}${esc(syncText)}</button>
     ${iconBtn('search', 'Suche', `data-action="tab" data-tab="search"${tab === 'search' ? ' aria-current="page"' : ''}`)}</div></header>
-  <main class="wrap" id="main">${flashNote(state)}${renderTab(state, tab)}</main>
+  <main class="wrap" id="main">${sub ? backLink('more', TABS.more) : ''}${renderTab(state, tab)}</main>
+  ${flashNote(state)}
   ${state.undo ? `<div class="toast" role="status"><span>${esc(state.undo.text)}</span><button class="btn small" type="button" data-action="undo">rückgängig</button></div>` : ''}
   <nav class="tabbar" aria-label="Bereiche"><div class="wrap" role="tablist">${tabs}</div></nav></div>`;
 }
 
-const flashNote = (state) => (state.flash ? `<div class="note info" role="status"><span class="cap">hinweis</span>${esc(state.flash)}</div>` : '');
+const backLink = (tab, label) => `<button type="button" class="backlink cap" data-action="back" data-tab="${tab}">${icon('back')}${esc(label)}</button>`;
+
+// Kurze Rückmeldung unten wie „rückgängig“, damit oben nichts verrutscht.
+const flashNote = (state) => (state.flash && !state.undo ? `<div class="toast flash" role="status"><span>${esc(state.flash)}</span></div>` : '');
 
 function renderTab(state, tab) {
   switch (tab) {
@@ -171,16 +178,22 @@ function eventLine(state, occ, today, current = false) {
 function taskTags(state, item, today, showDue) {
   const overdue = item.dueDate && item.dueDate < today && !item.done;
   return [
-    item.dueDate && (showDue || overdue) ? `<span class="tag${overdue ? ' acc' : ''}">${esc(dayLabel(item.dueDate, today))}</span>` : '',
+    item.dueDate && (showDue || overdue) ? `<span class="tag${overdue ? ' late' : ''}">${overdue && showDue ? 'überfällig · ' : ''}${esc(dayLabel(item.dueDate, today))}</span>` : '',
     item.important ? '<span class="tag inv">wichtig</span>' : '',
     item.assignee && !who(state, item.assignee) ? `<span class="tag">${esc(memberName(state, item.assignee))}</span>` : '',
   ].join('');
 }
 
-/** Zeile zum Abhaken. Nach rechts wischen hakt ab, nach links löscht. */
-function checkLine(item, title, sub, extra = '') {
-  return `<div class="item" data-swipe data-id="${item.id}"><label class="check"><input type="checkbox" data-action="toggle" data-id="${item.id}" ${item.done ? 'checked' : ''}>
-    <span class="t"><b>${title}</b>${sub ? `<span>${sub}</span>` : ''}</span></label>${extra}</div>`;
+/**
+ * Zeile zum Abhaken. Nach rechts wischen hakt ab, nach links löscht.
+ * editing: true/false macht den Text zum Knopf, der die Zeile zum Bearbeiten öffnet (der Kreis hakt ab).
+ */
+function checkLine(item, title, sub, extra = '', editing = null) {
+  const text = `<b>${title}</b>${sub ? `<span>${sub}</span>` : ''}`;
+  const box = `<input type="checkbox" data-action="toggle" data-id="${item.id}" ${item.done ? 'checked' : ''}`;
+  if (editing === null) return `<div class="item" data-swipe data-id="${item.id}"><label class="check">${box}><span class="t">${text}</span></label>${extra}</div>`;
+  return `<div class="item" data-swipe data-id="${item.id}"><label class="check box">${box} aria-label="${attr(item.title)} abhaken"></label>
+    <button type="button" class="t open" data-action="edit" data-id="${item.id}" aria-expanded="${editing}" title="Ändern">${text}</button>${extra}</div>`;
 }
 
 const taskLine = (state, item, today) => checkLine(item, esc(item.title), taskTags(state, item, today, false), who(state, item.assignee));
@@ -221,11 +234,12 @@ function renderToday(state) {
   return `
   <h1 class="bigtitle">heute</h1>
   <p class="meta-line">${meta}</p>
-  ${todayHints(state)}
+  ${quickAdd(state)}
   ${pins ? todayBoard(state) : ''}
   ${o.overdue.length ? `<section class="section">${group('überfällig')}${o.overdue.map((id) => taskLine(state, byId.get(id), state.today)).join('')}</section>` : ''}
   ${hasPlan || on(state, 'meals') || on(state, 'chores') ? `<section class="section">${group('heute')}${extras}${todayRows || (extras || open ? `<p class="empty">${esc(MSG.nothingToday)}</p>` : emptyState('today', MSG.nothingToday))}</section>` : ''}
   ${open}
+  ${todayHint(state)}
   ${on(state, 'contacts') ? todayBirthdays(state) : ''}
   ${hasPlan ? `<section class="section"><h2 class="head2">diese woche</h2>${week || `<p class="empty">${esc(MSG.nothingWeek)}</p>`}</section>` : ''}
   ${on(state, 'calendar') ? todayLater(state) : ''}
@@ -254,18 +268,31 @@ function todayOpen(state) {
   return `<section class="section">${group('offen, ohne datum')}${open.slice(0, 5).map((i) => taskLine(state, i, state.today)).join('')}${more}</section>`;
 }
 
-/** Hinweise oben auf „heute“: App auf den Home-Bildschirm holen, Sicherung fällig. */
-function todayHints(state) {
-  const hints = [];
+/** Schnell etwas eintragen, ohne den Bereich zu wechseln. Tag und Uhrzeit dürfen im Text stehen. */
+function quickAdd(state) {
+  const kinds = [['tasks', 'aufgabe'], ['shopping', 'einkauf'], ['calendar', 'termin']].filter(([m]) => on(state, m));
+  if (!kinds.length) return '';
+  const pick = kinds.some(([m]) => m === state.quickKind) ? state.quickKind : kinds[0][0];
+  const select = kinds.length > 1
+    ? `<select name="kind" aria-label="Art">${kinds.map(([m, label]) => `<option value="${m}" ${m === pick ? 'selected' : ''}>${label}</option>`).join('')}</select>`
+    : `<input type="hidden" name="kind" value="${pick}">`;
+  return `<form class="search quick" data-form="quick-add">
+    <input name="text" autocomplete="off" aria-label="Schnell eintragen" placeholder="Neu, z. B. Zahnarzt morgen 9 Uhr" enterkeyhint="done">
+    ${select}<button class="iconbtn" type="submit" aria-label="Eintragen" title="Eintragen">${icon('plus')}</button></form>`;
+}
+
+/** Ein Hinweis zur Zeit, klein unter dem Tag: App auf den Home-Bildschirm holen, sonst Sicherung fällig. */
+function todayHint(state) {
   if (state.installHint) {
-    const how = state.installHint === 'ios' ? MSG.installIos : MSG.installOther;
     const btn = state.installHint === 'prompt' ? '<button class="btn small primary" type="button" data-action="install">Installieren</button>' : '';
-    hints.push(`<div class="note info hint"><span class="cap">tipp</span><p>${esc(how)}</p><div class="actions-row">${btn}<button class="btn small" type="button" data-action="dismiss-hint" data-hint="install">Verstanden</button></div></div>`);
+    return `<div class="hintline"><p><span class="cap">tipp</span>${esc(state.installHint === 'ios' ? MSG.installIos : MSG.installOther)}</p>
+      <div class="actions-row">${btn}<button class="btn small quiet" type="button" data-action="dismiss-hint" data-hint="install">Verstanden</button></div></div>`;
   }
   if (state.backupDue) {
-    hints.push(`<div class="note hint"><span class="cap">sicherung</span><p>${esc(state.lastExport ? MSG.backupDue : MSG.backupNever)}</p><div class="actions-row"><button class="btn small primary" type="button" data-action="export">Jetzt sichern</button><button class="btn small" type="button" data-action="dismiss-hint" data-hint="backup">Später</button></div></div>`);
+    return `<div class="hintline"><p><span class="cap">sicherung</span>${esc(state.lastExport ? MSG.backupDue : MSG.backupNever)}</p>
+      <div class="actions-row"><button class="btn small" type="button" data-action="export">Jetzt sichern</button><button class="btn small quiet" type="button" data-action="dismiss-hint" data-hint="backup">Später</button></div></div>`;
   }
-  return hints.join('');
+  return '';
 }
 
 function todayBoard(state) {
@@ -306,12 +333,14 @@ function birthdayLine(state, c, b) {
 
 function listPicker(state, kind, currentId) {
   const lists = alive(state.data.lists).filter((l) => l.kind === kind && !l.archived).sort((a, b) => a.sort - b.sort);
+  const current = lists.find((l) => l.id === currentId);
   const opts = lists.map((l) => `<option value="${l.id}" ${l.id === currentId ? 'selected' : ''}>${esc(l.name.toLocaleLowerCase('de-DE'))}</option>`).join('');
+  // Umbenennen und neue Liste stehen im Listenmenü, sichtbar bleibt nur „teilen“.
+  const what = kind === 'template' ? 'vorlage' : 'liste';
   return `<div class="listbar">
-    <label class="field"><select aria-label="Liste" data-action="pick-list" data-kind="${kind}">${opts}</select></label>
-    ${kind !== 'template' ? iconBtn('share', 'Liste teilen', `data-action="share-list" data-id="${currentId}"`) : ''}
-    ${iconBtn('edit', 'Liste umbenennen', `data-action="rename-list" data-id="${currentId}"`)}
-    ${iconBtn('plus', 'Neue Liste', `data-action="new-list" data-kind="${kind}"`)}</div>`;
+    <label class="listpick"><span class="name">${esc(current?.name || '')}</span>${icon('down')}<select aria-label="Liste wählen, umbenennen oder neu" data-action="pick-list" data-kind="${kind}">${opts}
+      <option disabled>──────────</option><option value="__rename">${what} umbenennen …</option><option value="__new">neue ${what} …</option></select></label>
+    ${kind !== 'template' ? iconBtn('share', 'Liste teilen', `data-action="share-list" data-id="${currentId}"`) : ''}</div>`;
 }
 
 function doneBlock(listId, rows) {
@@ -324,7 +353,7 @@ function renderShopping(state) {
   if (!list) return '';
   const g = groupShopping(itemsOf(state.data.items, list.id));
   const open = g.open.reduce((n, grp) => n + grp.items.length, 0);
-  const groups = g.open.map((grp) => `<section class="section">${group(CATEGORY[grp.category])}
+  const groups = g.open.map((grp) => `<section class="section compact">${group(CATEGORY[grp.category])}
     ${grp.items.map((i) => shopRow(state, i)).join('')}</section>`).join('');
   // Vorschläge aus früheren Einkäufen, ohne das, was gerade offen auf der Liste steht
   const shopLists = new Set(state.data.lists.filter((l) => l.kind === 'shopping' || l.kind === 'template').map((l) => l.id));
@@ -348,10 +377,9 @@ const categorySelect = () => `<select name="category" aria-label="Bereich"><opti
 function shopRow(state, i) {
   const editing = state.editing === i.id;
   const title = `${i.quantity ? `<span class="fill">${esc(i.quantity)}</span> ` : ''}${esc(i.title)}`;
-  const edit = `<button class="iconbtn" type="button" data-action="edit" data-id="${i.id}" aria-expanded="${editing}" aria-label="${editing ? 'Fertig' : 'Ändern'}" title="${editing ? 'Fertig' : 'Ändern'}">${icon('edit')}</button>`;
   // Wer etwas auf die Liste gesetzt hat, steht nur bei den anderen dabei.
   const by = i.changedBy && i.changedBy !== state.session?.user.id ? who(state, i.changedBy) : '';
-  const head = checkLine(i, title, i.note ? esc(i.note) : '', by + edit);
+  const head = checkLine(i, title, i.note ? esc(i.note) : '', by, editing);
   if (!editing) return head;
   return head + `<form class="editor taskedit" data-form="edit-shop" data-id="${i.id}">
     <div class="pair"><label class="field"><span class="cap">was</span><input name="title" value="${attr(i.title)}" required></label>
@@ -359,6 +387,7 @@ function shopRow(state, i) {
     <label class="field"><span class="cap">bereich</span><select name="category">${SHOPPING_CATEGORIES.map((c) => `<option value="${c}" ${c === (i.category || 'other') ? 'selected' : ''}>${esc(CATEGORY[c])}</option>`).join('')}</select></label>
     <label class="field"><span class="cap">notiz</span><input name="note" value="${attr(i.note || '')}" placeholder="z. B. die laktosefreie"></label>
     <div class="actions"><button class="btn primary" type="submit">Speichern</button>
+      <button class="btn" type="button" data-action="edit" data-id="${i.id}">Schließen</button>
       <button class="btn" type="button" data-action="delete-item" data-id="${i.id}">Löschen</button></div></form>`;
 }
 
@@ -389,8 +418,7 @@ function templatePicker(state, listId) {
 
 function taskRow(state, i) {
   const editing = state.editing === i.id;
-  const edit = `<button class="iconbtn" type="button" data-action="edit" data-id="${i.id}" aria-expanded="${editing}" aria-label="${editing ? 'Fertig' : 'Ändern'}" title="${editing ? 'Fertig' : 'Ändern'}">${icon('edit')}</button>`;
-  const head = checkLine(i, esc(i.title), taskTags(state, i, state.today, true), who(state, i.assignee) + edit);
+  const head = checkLine(i, esc(i.title), taskTags(state, i, state.today, true), who(state, i.assignee), editing);
   if (!editing) return head;
   const members = state.members.map((m) => `<option value="${m.id}" ${m.id === i.assignee ? 'selected' : ''}>${esc(m.name || 'ohne Namen')}</option>`).join('');
   return head + `<form class="editor taskedit" data-form="edit-task" data-id="${i.id}">
@@ -400,10 +428,15 @@ function taskRow(state, i) {
     <label class="field"><span class="cap">notiz</span><input name="note" value="${attr(i.note || '')}"></label>
     <label class="check inline"><input type="checkbox" name="important" ${i.important ? 'checked' : ''}><span class="t"><b>wichtig</b></span></label>
     <div class="actions"><button class="btn primary" type="submit">Speichern</button>
+      <button class="btn" type="button" data-action="edit" data-id="${i.id}">Schließen</button>
       <button class="btn" type="button" data-action="delete-item" data-id="${i.id}">Löschen</button></div></form>`;
 }
 
 // ---- Kalender ------------------------------------------------------------------
+
+const quickEvent = () => `<form class="search" data-form="quick-event">
+    <input name="text" autocomplete="off" aria-label="Neuer Termin" placeholder="z. B. Elternabend morgen 19 Uhr" enterkeyhint="done" required>
+    <button class="iconbtn" type="submit" aria-label="Eintragen" title="Eintragen">${icon('plus')}</button></form>`;
 
 function renderCalendar(state) {
   const month = state.calView === 'month';
@@ -428,6 +461,7 @@ function renderCalendar(state) {
     <span class="cap">${esc(fmtMonth.format(asDate(`${g.month}-01`)))}</span>
     ${iconBtn('next', 'Monat weiter', 'data-action="cal-move" data-step="1"')}</div>
   ${views}
+  ${quickEvent()}
   <div class="month"><div class="wdays" aria-hidden="true">${['mo', 'di', 'mi', 'do', 'fr', 'sa', 'so'].map((x) => `<span>${x}</span>`).join('')}</div><div class="mgrid">${cells}</div></div>
   <section class="section">${dayHead(pick, state.today)}${sel ? sel.events.map(eventRow).join('') : `<p class="empty small">${esc(MSG.noEventsDay)}</p>`}</section>
   ${eventForm(state, editing || null, pick)}
@@ -445,8 +479,10 @@ function renderCalendar(state) {
     <span class="cap">${esc(fmtRange.format(asDate(from)))} – ${esc(fmtRange.format(asDate(to)))}</span>
     ${iconBtn('next', 'Vier Wochen weiter', 'data-action="cal-move" data-step="1"')}</div>
   ${views}
-  ${eventForm(state, editing || null)}
+  ${quickEvent()}
+  ${editing ? eventForm(state, editing) : ''}
   <section class="section">${list || emptyState('calendar', MSG.noEvents)}</section>
+  ${editing ? '' : eventForm(state, null)}
   ${feedSection(state)}
   ${aboSection(state)}`;
 }
@@ -500,18 +536,21 @@ function feedSection(state) {
 function eventForm(state, ev, day = state.today) {
   const v = ev || { title: '', startDate: day, endDate: day, startTime: null, endTime: null, repeat: 'none', repeatInterval: 1, repeatUntil: null, notes: null, people: [] };
   const people = state.members.map((m) => `<label class="check inline"><input type="checkbox" name="people" value="${m.id}" ${v.people.includes(m.id) ? 'checked' : ''}><span class="t"><b>${esc(m.name || 'ohne Namen')}</b></span></label>`).join('');
-  return `<details ${ev ? 'open' : ''} class="event-form"><summary>${ev ? 'termin ändern' : 'neuer termin'}</summary><div>
+  // Das Übliche (Titel, Tag, Uhrzeit) offen, der Rest unter „mehr angaben“. Offen, wenn dort schon etwas steht.
+  const extra = v.endDate !== v.startDate || v.repeat !== 'none' || v.notes || v.people.length;
+  return `<details ${ev ? 'open' : ''} class="event-form" data-key="event-form"><summary>${ev ? 'termin ändern' : 'neuer termin mit allen angaben'}</summary><div>
   <form class="editor" data-form="save-event" data-id="${ev ? ev.id : ''}">
     <label class="field"><span class="cap">titel</span><input name="title" value="${attr(v.title)}" required></label>
-    <div class="pair"><label class="field"><span class="cap">von</span><input name="startDate" type="date" value="${v.startDate}" required></label>
-      <label class="field"><span class="cap">bis</span><input name="endDate" type="date" value="${v.endDate}"></label></div>
+    <label class="field"><span class="cap">tag</span><input name="startDate" type="date" value="${v.startDate}" required></label>
     <div class="pair"><label class="field"><span class="cap">beginn</span><input name="startTime" type="time" value="${attr(v.startTime || '')}"></label>
       <label class="field"><span class="cap">ende</span><input name="endTime" type="time" value="${attr(v.endTime || '')}"></label></div>
+    <details class="more-fields" data-key="event-more"${extra ? ' open' : ''}><summary>mehr angaben: mehrtägig, wiederholen, wer, notiz</summary><div class="editor">
+    <label class="field"><span class="cap">bis (bei mehreren tagen)</span><input name="endDate" type="date" value="${v.endDate}"></label>
     <div class="pair"><label class="field"><span class="cap">wiederholen</span><select name="repeat">${REPEATS.map((r) => `<option value="${r}" ${r === v.repeat ? 'selected' : ''}>${esc(REPEAT[r])}</option>`).join('')}</select></label>
       <label class="field"><span class="cap">alle … ${esc(REPEAT_EVERY[v.repeat] || '')}</span><input name="repeatInterval" type="number" min="1" max="99" value="${v.repeatInterval}"></label></div>
     <label class="field"><span class="cap">wiederholen bis (optional)</span><input name="repeatUntil" type="date" value="${attr(v.repeatUntil || '')}"></label>
     ${people ? `<fieldset class="people"><legend class="cap">wer</legend>${people}</fieldset>` : ''}
-    <label class="field"><span class="cap">notiz</span><input name="notes" value="${attr(v.notes || '')}"></label>
+    <label class="field"><span class="cap">notiz</span><input name="notes" value="${attr(v.notes || '')}"></label></div></details>
     <div class="actions"><button class="btn primary" type="submit">Speichern</button>
       ${ev ? `<button class="btn" type="button" data-action="cancel-edit">Abbrechen</button><button class="btn" type="button" data-action="delete-event" data-id="${ev.id}">Löschen</button>` : ''}</div>
   </form></div></details>`;
@@ -648,7 +687,7 @@ function renderProject(state, p) {
   const items = sortTasks(itemsOf(state.data.items, p.id));
   const open = items.filter((i) => !i.done); const done = items.filter((i) => i.done);
   const pr = progress(state.data.items, p.id);
-  return `<div class="listbar">${iconBtn('back', 'Alle Projekte', 'data-action="open-project" data-id=""')}
+  return `<div class="listbar">${iconBtn('back', 'Alle Projekte', 'data-action="back" data-tab="projects"')}
     <h1 class="bigtitle inline">${esc(p.name)}</h1>${iconBtn('edit', 'Umbenennen', `data-action="rename-list" data-id="${p.id}"`)}</div>
   <p class="meta-line">${pr.done} von ${pr.total} erledigt</p>
   ${pr.total ? `<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${pr.total}" aria-valuenow="${pr.done}"><span style="width:${(pr.done / pr.total) * 100}%"></span></div>` : ''}
@@ -813,9 +852,13 @@ function storageFields(state, mode, setup = false) {
 const accountButtons = `<div class="actions"><button class="btn primary" type="submit" name="mode" value="login">Anmelden</button>
   <button class="btn" type="submit" name="mode" value="register">Neues Konto</button></div>`;
 
+/** Ohne gemeinsamen Haushalt bringen diese Module wenig: dazuschreiben. */
+const PAIR_MODULES = ['chores', 'expenses'];
+
 function moduleChecks(state, form) {
+  const alone = !state.session?.household;
   return MODULES.map((m) => `<label class="choice"><input type="checkbox" name="modules" value="${m}" ${form ? '' : 'data-action="toggle-module"'} ${on(state, m) ? 'checked' : ''}>
-    <span class="t"><b>${esc(MODULE[m][0])}</b><span>${esc(MODULE[m][1])}</span></span></label>`).join('');
+    <span class="t"><b>${esc(MODULE[m][0])}</b><span>${esc(MODULE[m][1])}${alone && PAIR_MODULES.includes(m) ? ` <em class="needs">${esc(MSG.needsPartner)}</em>` : ''}</span></span></label>`).join('');
 }
 
 // ---- Einrichtung -----------------------------------------------------------------------
@@ -841,6 +884,10 @@ function renderSetup(state) {
 
 const infoRow = (label, value) => `<div class="item"><span class="t"><span>${esc(label)}</span><b>${value}</b></span></div>`;
 
+/** Eingeklappte Einstellung mit einer Zeile, die sagt, wie es gerade steht. */
+const setting = (key, title, summary, body, open = false) => `<details class="setting" data-key="${key}"${open ? ' open' : ''}>
+  <summary><span>${esc(title)}</span><span class="sum">${esc(summary)}</span></summary><div>${body}</div></details>`;
+
 function renderMore(state) {
   const s = state.session;
   const extra = tabLayout(state.settings.modules).more;
@@ -855,27 +902,31 @@ function renderMore(state) {
        ${!s.household ? householdForms() : `<details><summary>anderem haushalt beitreten</summary><div>${joinForm()}</div></details>`}
        <div class="actions-row"><button class="btn" type="button" data-action="sync-now">Jetzt abgleichen</button>
           <button class="btn quiet" type="button" data-action="logout">Abmelden / Speicherort wechseln</button></div>`
-    : `${infoRow('speicherort', esc(STORAGE.local[0]))}
-       <details${state.setupMode !== 'local' ? ' open' : ''}><summary>mit partner teilen / speicherort ändern</summary><div>
-       <form class="editor" data-form="login">${storageFields(state, state.setupMode)}
-       <div data-modes="local" class="fields" ${state.setupMode === 'local' ? '' : 'hidden'}><p class="empty">Alles bleibt auf diesem Gerät. Zum Teilen mit dem Partner meldet ihr euch beide am selben Server an.</p></div></form></div></details>`;
+    : `<form class="editor" data-form="login">${storageFields(state, state.setupMode)}
+       <div data-modes="local" class="fields" ${state.setupMode === 'local' ? '' : 'hidden'}><p class="empty">Alles bleibt auf diesem Gerät. Zum Teilen mit dem Partner meldet ihr euch beide am selben Server an.</p></div></form>`;
+  const where = s
+    ? [STORAGE[state.settings.storage][0], s.household ? (state.members.length === 1 ? '1 person' : `${state.members.length} personen`) : 'noch kein haushalt'].join(' · ')
+    : STORAGE.local[0];
+  const n = state.settings.modules.length;
+  const push = !s ? 'nur mit server' : state.push === 'on' ? 'an' : state.push === 'off' ? 'aus' : '';
+  const backup = state.lastExport ? `zuletzt ${dayLabel(state.lastExport, state.today)}` : 'noch nie';
+  // Aufgeklappt, wenn dort gerade etwas zu tun ist: Server gewählt, aber noch nicht angemeldet; angemeldet ohne Haushalt.
+  const storageOpen = state.openStorage || (!s && state.setupMode !== 'local') || (s && !s.household);
   return `
   <h1 class="bigtitle">Mehr</h1>
   ${extra.length ? `<section class="section">${group('bereiche')}${extra.map((m) => `<button type="button" class="item" data-action="tab" data-tab="${m}">
     <span class="ico">${icon(m)}</span><span class="t"><b>${esc(TABS[m])}</b></span>${icon('next')}</button>`).join('')}</section>` : ''}
-  <section class="section">${group('speicherort und teilen')}${account}</section>
-  <section class="section">${group('module')}
-    <p class="empty">Was ausgeschaltet ist, verschwindet überall. Die Einträge bleiben gespeichert.</p>
-    <div class="choices">${moduleChecks(state, false)}</div></section>
-  <section class="section">${group('erinnerungen')}${pushSection(state)}</section>
-  <section class="section">${group('darstellung')}
-    <label class="field"><span class="cap">farbschema</span><select data-action="theme">${Object.entries(THEME).map(([k, v]) => `<option value="${k}" ${k === state.settings.theme ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label></section>
-  <section class="section">${group('sicherung')}
-    <p class="empty">Alle Einträge als Datei sichern oder aus einer Sicherung zurückholen.
-      ${esc(state.lastExport ? MSG.lastBackup(dayLabel(state.lastExport, state.today, true)) : MSG.noBackupYet)}
+  <section class="section settings">${group('einstellungen')}
+  ${setting('storage', 'speicherort und teilen', where, account, storageOpen)}
+  ${setting('modules', 'module', `${n} von ${MODULES.length} an`, `<p class="empty">Was ausgeschaltet ist, verschwindet überall. Die Einträge bleiben gespeichert.</p>
+    <div class="choices">${moduleChecks(state, false)}</div>`)}
+  ${setting('push', 'erinnerungen', push, pushSection(state))}
+  ${setting('theme', 'darstellung', THEME[state.settings.theme] || '', `<label class="field"><span class="cap">farbschema</span><select data-action="theme">${Object.entries(THEME).map(([k, v]) => `<option value="${k}" ${k === state.settings.theme ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>`)}
+  ${setting('backup', 'sicherung', backup, `<p class="empty">Alle Einträge als Datei sichern oder aus einer Sicherung zurückholen.
       ${s ? esc(MSG.backupServer) : ''}</p>
     <div class="actions-row"><button class="btn" type="button" data-action="export">Sicherung speichern</button>
-      <label class="btn">Sicherung laden<input type="file" accept="application/json,.json" data-action="import" hidden></label></div></section>`;
+      <label class="btn">Sicherung laden<input type="file" accept="application/json,.json" data-action="import" hidden></label></div>`)}
+  </section>`;
 }
 
 /** Erinnerungen ein- und ausschalten, je Gerät. state.push: unsupported | no-server | off | on | denied */

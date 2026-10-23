@@ -5,11 +5,11 @@ import {
 } from './model.js';
 import {
   splitQuickAdd, itemsOf, serverAddress, addressWarning, guessStorage, fromTemplate, parseAmount, parseDayMonth,
-  shoppingHistory, parseIcs, icsName, addDays, alive, guessCategory,
+  shoppingHistory, parseIcs, icsName, addDays, alive, guessCategory, parseQuickWhen, dayNumber,
 } from './logic.js';
 import * as storage from './storage.js';
 import { createClient, markDirty, syncOnce, subscribe } from './sync.js';
-import { renderShell, on, shareText, aboUrl } from './ui.js';
+import { renderShell, on, shareText, aboUrl, dayLabel } from './ui.js';
 import { HOPPER_SVG } from './raven.js';
 import { DEFAULT_LIST_NAME, MSG, IMPORT_ERROR, SYNC, ADDRESS_ERROR, errorText } from './texts.js';
 
@@ -32,6 +32,8 @@ const state = {
   editing: null, calOffset: 0, calView: 'list', calDay: '', mealOffset: 0, flash: '',
   undo: null, // { text, changes:[{collection, id, fields}] } für „rückgängig“
   query: '', prevTab: 'today',
+  quickKind: '', // zuletzt gewählte Art in der Schnelleingabe auf „heute“
+  closeForms: false, fresh: '', // nach dem Speichern: Formulare zu, neuen Eintrag zeigen
   feeds: {}, // fremde Kalender: { [calendarId]: { url, at, events, error } }
   feedLink: '', // Kalender-Abo: geheimer Schlüssel, '' = aus, null = Server kennt es nicht
   push: '', // Erinnerungen auf diesem Gerät, siehe pushSection in ui.js
@@ -65,10 +67,14 @@ function render(focusSelector) {
   const typed = !focusSelector && form && 'value' in active ? { value: active.value, start: active.selectionStart } : null;
   // Aufgeklappte Bereiche („neuer kontakt“ …) bleiben beim Neuzeichnen offen, solange man im selben Bereich bleibt.
   const sameTab = lastTab === state.tab;
-  const opened = sameTab ? new Set([...root.querySelectorAll('details[open] > summary')].map((x) => x.textContent)) : new Set();
+  // Nach dem Speichern klappen die Formulare zu, damit der neue Eintrag zu sehen ist.
+  const key = (d) => d.dataset.key || d.querySelector(':scope > summary')?.textContent;
+  const opened = sameTab && !state.closeForms ? new Set([...root.querySelectorAll('details[open]')].map(key)) : new Set();
+  state.closeForms = false;
   lastTab = state.tab;
   root.innerHTML = renderShell(state);
-  for (const x of root.querySelectorAll('details:not([open]) > summary')) if (opened.has(x.textContent)) x.parentElement.open = true;
+  for (const d of root.querySelectorAll('details:not([open])')) if (opened.has(key(d))) d.open = true;
+  if (state.fresh) { showFresh(state.fresh); state.fresh = ''; return; }
   const el = keep ? root.querySelector(keep) : null;
   if (!el) return;
   el.focus();
@@ -76,6 +82,43 @@ function render(focusSelector) {
   if (el.value !== typed.value) el.value = typed.value;
   try { el.setSelectionRange(typed.start, typed.start); } catch { /* kein Textfeld */ }
 }
+
+/** Gerade gespeicherten Eintrag in den Blick holen und kurz hervorheben. */
+function showFresh(id) {
+  const el = root.querySelector(`[data-id="${id}"]`);
+  const row = el?.closest('.item, .taskedit') || el;
+  if (!row) return;
+  row.classList.add('fresh');
+  row.scrollIntoView({ block: 'center', behavior: calm() ? 'smooth' : 'auto' });
+}
+
+/** Nach dem Speichern: Bearbeiten beenden, Formulare zuklappen, den Eintrag zeigen. */
+function saved(id) {
+  state.editing = null; state.closeForms = true; state.fresh = id || '';
+  render();
+}
+
+// ---- Verlauf: Zurück-Geste und Zurück-Taste bleiben in der App ---------------------------
+
+const view = () => ({ tab: state.tab, projectId: state.projectId });
+const sameView = (a, b) => a && b && a.tab === b.tab && (a.projectId || '') === (b.projectId || '');
+
+/** Zu einer Ansicht wechseln und sie im Verlauf merken. */
+function navigate(changes, replace = false) {
+  Object.assign(state, changes);
+  state.editing = null;
+  const v = view();
+  const depth = history.state?.depth || 0;
+  if (replace || sameView(history.state, v)) history.replaceState({ ...v, depth }, '');
+  else history.pushState({ ...v, depth: depth + 1 }, '');
+  render(); scrollTo(0, 0);
+}
+
+addEventListener('popstate', (e) => {
+  const v = e.state || { tab: 'today', projectId: '' };
+  state.tab = v.tab; state.projectId = v.projectId || ''; state.editing = null;
+  render(); scrollTo(0, 0);
+});
 
 function flash(text) { state.flash = text; render(); setTimeout(() => { if (state.flash === text) { state.flash = ''; render(); } }, 4000); }
 
@@ -394,10 +437,16 @@ async function connect() {
 
 const actions = {
   tab: (el) => {
-    if (el.dataset.tab === 'search' && state.tab === 'search') { state.tab = state.prevTab; render(); return; }
+    if (el.dataset.tab === 'search' && state.tab === 'search') { actions.back({ dataset: { tab: state.prevTab } }); return; }
     if (el.dataset.tab === 'search') state.prevTab = state.tab;
-    state.tab = el.dataset.tab; state.editing = null; render();
+    // Ein Bereich aus der Leiste fängt wieder oben an (z. B. Projekte mit der Übersicht).
+    navigate({ tab: el.dataset.tab, ...(el.dataset.tab === 'projects' ? { projectId: '' } : {}) });
     if (el.dataset.tab === 'search') root.querySelector('[data-live="search"]')?.focus();
+  },
+  /** Zurück wie die Geste; ohne Verlauf (z. B. frisch geöffnet) zur übergeordneten Seite. */
+  back: (el) => {
+    if ((history.state?.depth || 0) > 0) history.back();
+    else navigate({ tab: el.dataset.tab || 'today', projectId: '' }, true);
   },
   toggle: async (el) => {
     haptic();
@@ -422,10 +471,9 @@ const actions = {
   },
   'open-result': (el) => {
     const { area, id, list } = el.dataset;
-    state.editing = null;
-    if (area === 'shopping' || area === 'tasks') { state.tab = area; state[LIST_KEY[area]] = list; state.editing = id; }
-    else if (area === 'project') { state.tab = 'projects'; state.projectId = list; state.editing = id === list ? null : id; }
-    else { state.tab = area; if (['calendar', 'notes', 'contacts', 'chores'].includes(area)) state.editing = id; }
+    if (area === 'shopping' || area === 'tasks') { state[LIST_KEY[area]] = list; navigate({ tab: area }); state.editing = id; }
+    else if (area === 'project') { navigate({ tab: 'projects', projectId: list }); state.editing = id === list ? null : id; }
+    else { navigate({ tab: area }); if (['calendar', 'notes', 'contacts', 'chores'].includes(area)) state.editing = id; }
     render();
     const target = root.querySelector(`[data-id="${id}"]`);
     if (target) target.scrollIntoView({ block: 'center' }); else scrollTo(0, 0);
@@ -440,7 +488,13 @@ const actions = {
   'push-test': async () => {
     try { await client.request('POST', '/api/hm/push-test'); flash(MSG.pushTestSent); } catch { alert(MSG.pushFailed); }
   },
-  'pick-list': (el) => { state[LIST_KEY[el.dataset.kind]] = el.value; render(); },
+  'pick-list': (el) => {
+    // Im Listenmenü stehen auch „umbenennen“ und „neue liste“.
+    const current = state[LIST_KEY[el.dataset.kind]];
+    if (el.value === '__new') { el.value = current; actions['new-list'](el); return; }
+    if (el.value === '__rename') { el.value = current; actions['rename-list']({ dataset: { id: current } }); return; }
+    state[LIST_KEY[el.dataset.kind]] = el.value; render();
+  },
   'new-list': async (el) => {
     const name = prompt(el.dataset.kind === 'template' ? 'Name der Vorlage' : 'Name der neuen Liste', el.dataset.kind === 'template' && !state.templateId ? DEFAULT_LIST_NAME.template : ''); if (!name) return;
     const l = newList(ctx(), el.dataset.kind, name); await save('lists', l);
@@ -463,7 +517,7 @@ const actions = {
   'delete-event': async (el) => { await changeWithUndo('events', [el.dataset.id], { deleted: true }, MSG.undoDeleted); state.editing = null; render(); },
   'cal-move': (el) => { state.calOffset += Number(el.dataset.step); render(); },
   'cal-view': (el) => { state.calView = el.dataset.view; state.calOffset = 0; state.calDay = ''; store.setMeta('calView', state.calView); render(); },
-  'cal-month': () => { state.calView = 'month'; state.calOffset = 0; state.calDay = ''; state.editing = null; store.setMeta('calView', 'month'); state.tab = 'calendar'; render(); scrollTo(0, 0); },
+  'cal-month': () => { state.calView = 'month'; state.calOffset = 0; state.calDay = ''; store.setMeta('calView', 'month'); navigate({ tab: 'calendar' }); },
   'cal-day': (el) => { state.calDay = el.dataset.date; state.editing = null; render(); },
   'meal-move': (el) => { state.mealOffset += Number(el.dataset.step); render(); },
   theme: async (el) => { await saveSettings({ theme: el.value }); applyTheme(); render(); },
@@ -499,15 +553,16 @@ const actions = {
     await save('expenses', newRecord('expenses', ctx(), { kind: 'settle', title: 'Ausgleich', amount: Number(el.dataset.cents), date: state.today, paidBy: el.dataset.from, people: [el.dataset.to] }));
     render();
   },
-  'open-project': (el) => { state.projectId = el.dataset.id; state.editing = null; render(); scrollTo(0, 0); },
+  'open-project': (el) => navigate({ projectId: el.dataset.id }),
   'archive-project': async (el) => {
     const p = state.data.lists.find((l) => l.id === el.dataset.id);
-    await update('lists', p.id, { archived: !p.archived }); state.projectId = ''; render();
+    await update('lists', p.id, { archived: !p.archived }); navigate({ projectId: '' }, true);
   },
   'gift-status': (el) => update('gifts', el.dataset.id, { status: el.value }),
   'apply-template': (el) => applyTemplate(el.value, el.dataset.list),
   'apply-template-from': (el) => applyTemplate(el.dataset.template, el.value),
   'sync-now': () => scheduleSync(0),
+  'open-storage': () => { state.openStorage = true; navigate({ tab: 'more' }); state.openStorage = false; },
   'dismiss-hint': async (el) => {
     if (el.dataset.hint === 'install') hintMeta.installDismissed = true; else hintMeta.backupLater = state.today;
     await store.setMeta('hints', hintMeta); render();
@@ -547,16 +602,61 @@ const actions = {
   },
 };
 
+/** Einkauf eintragen. Bereich: von Hand gewählt, sonst wie beim letzten Mal, sonst aus dem Namen geraten. */
+async function addShopping(text, chosen) {
+  const known = shoppingHistory(state.data.items, new Set(state.data.lists.filter((l) => l.kind === 'shopping').map((l) => l.id))).category;
+  const parts = splitQuickAdd(text);
+  for (const p of parts) {
+    const category = chosen || known.get(p.title.toLowerCase()) || guessCategory(p.title) || 'other';
+    await save('items', newItem(ctx(), state.shopListId, p.title, { quantity: p.quantity, category }));
+  }
+  return parts.length;
+}
+
+const quickEventFields = (q, date) => ({
+  title: q.title, startDate: date, endDate: date, startTime: q.startTime, endTime: q.endTime,
+  repeat: 'none', repeatInterval: 1, repeatUntil: null, notes: '', people: [],
+});
+
 const forms = {
   'add-shopping': async (f) => {
-    // Bereich: von Hand gewählt, sonst wie beim letzten Mal, sonst aus dem Namen geraten.
-    const chosen = f.category.value;
-    const known = shoppingHistory(state.data.items, new Set(state.data.lists.filter((l) => l.kind === 'shopping').map((l) => l.id))).category;
-    for (const p of splitQuickAdd(f.text.value)) {
-      const category = chosen || known.get(p.title.toLowerCase()) || guessCategory(p.title) || 'other';
-      await save('items', newItem(ctx(), state.shopListId, p.title, { quantity: p.quantity, category }));
-    }
+    await addShopping(f.text.value, f.category.value);
     render('form[data-form="add-shopping"] [name="text"]');
+  },
+  /** Schnelleingabe auf „heute“: Aufgabe, Einkauf oder Termin, Tag und Uhrzeit stehen im Text. */
+  'quick-add': async (f) => {
+    const kind = f.kind?.value || 'tasks'; const text = f.text.value.trim();
+    if (!text) return;
+    state.quickKind = kind;
+    if (kind === 'shopping') {
+      const n = await addShopping(text, '');
+      flash(MSG.quickShopping(n)); render('form[data-form="quick-add"] [name="text"]');
+      return;
+    }
+    const q = parseQuickWhen(text, state.today);
+    if (!q.title) { alert(MSG.quickNoTitle); return; }
+    if (kind === 'calendar') {
+      const date = q.date || state.today;
+      await save('events', newEvent(ctx(), quickEventFields(q, date)));
+      flash(MSG.quickEvent(dayLabel(date, state.today), q.startTime));
+    } else {
+      await save('items', newItem(ctx(), state.taskListId, q.title, { dueDate: q.date }));
+      flash(MSG.quickTask(q.date ? dayLabel(q.date, state.today) : ''));
+    }
+    render('form[data-form="quick-add"] [name="text"]');
+  },
+  'quick-event': async (f) => {
+    const q = parseQuickWhen(f.text.value, state.today);
+    if (!q.title) { alert(MSG.quickNoTitle); return; }
+    const month = state.calView === 'month';
+    const date = q.date || (month && state.calDay) || state.today;
+    const ev = newEvent(ctx(), quickEventFields(q, date));
+    await save('events', ev);
+    // Dorthin blättern, wo der Termin steht.
+    if (month) { state.calOffset = (Number(date.slice(0, 4)) - Number(state.today.slice(0, 4))) * 12 + Number(date.slice(5, 7)) - Number(state.today.slice(5, 7)); state.calDay = date; }
+    else state.calOffset = Math.floor((dayNumber(date) - dayNumber(state.today)) / 28);
+    f.reset();
+    saved(ev.id);
   },
   'edit-shop': async (f) => {
     await update('items', f.dataset.id, { title: f.title.value, quantity: f.quantity.value, category: f.category.value, note: f.note.value });
@@ -594,16 +694,16 @@ const forms = {
       repeatInterval: Number(f.repeatInterval.value) || 1, repeatUntil: f.repeatUntil.value || null,
       notes: f.notes.value, people: [...f.querySelectorAll('[name="people"]:checked')].map((x) => x.value),
     };
-    if (f.dataset.id) await update('events', f.dataset.id, fields);
-    else await save('events', newEvent(ctx(), fields));
-    state.editing = null; render();
+    let id = f.dataset.id;
+    if (id) await update('events', id, fields);
+    else { const ev = newEvent(ctx(), fields); id = ev.id; await save('events', ev); }
+    saved(id);
   },
   setup: async (f, submitter) => {
     await saveSettings({ modules: new FormData(f).getAll('modules') });
     if (!(await chooseStorage(f, submitter))) return;
     state.setup = false; await store.setMeta('setupPending', false);
-    if (state.session && !state.session.household) state.tab = 'more';
-    render();
+    navigate({ tab: state.session && !state.session.household ? 'more' : 'today' }, true);
   },
   login: async (f, submitter) => { if (await chooseStorage(f, submitter)) render(); },
   'add-pin': async (f) => {
@@ -619,24 +719,27 @@ const forms = {
       title: f.title.value, unit: f.unit.value, interval: Number(f.interval.value) || 1, startDate: f.startDate.value,
       people: [...f.querySelectorAll('[name="people"]:checked')].map((x) => x.value),
     };
-    if (f.dataset.id) await update('chores', f.dataset.id, fields);
-    else await save('chores', newRecord('chores', ctx(), { ...fields }));
-    state.editing = null; render();
+    let id = f.dataset.id;
+    if (id) await update('chores', id, fields);
+    else { const c = newRecord('chores', ctx(), { ...fields }); id = c.id; await save('chores', c); }
+    saved(id);
   },
   'add-expense': async (f) => {
     const amount = parseAmount(f.amount.value);
     if (amount === null) { alert(MSG.badAmount); return; }
     // Beteiligte ausdrücklich speichern, damit alte Ausgaben nicht auf später Dazugekommene verteilt werden.
     const people = [...f.querySelectorAll('[name="people"]:checked')].map((x) => x.value);
-    await save('expenses', newRecord('expenses', ctx(), {
+    const e = newRecord('expenses', ctx(), {
       kind: 'expense', title: f.title.value, amount, date: f.date.value,
       paidBy: f.paidBy ? f.paidBy.value : state.session?.user.id || null, people,
-    }));
-    render();
+    });
+    await save('expenses', e);
+    saved(e.id);
   },
   'add-project': async (f) => {
     const l = newList(ctx(), 'project', f.name.value); await save('lists', l);
-    state.projectId = l.id; render('form[data-form="add-step"] [name="title"]');
+    navigate({ projectId: l.id });
+    root.querySelector('form[data-form="add-step"] [name="title"]')?.focus();
   },
   'add-step': async (f) => {
     await save('items', newItem(ctx(), f.dataset.list, f.title.value, { dueDate: f.dueDate.value || null }));
@@ -645,9 +748,10 @@ const forms = {
   'save-note': async (f) => {
     const fields = { title: f.title.value, body: f.body.value, ...(f.pinned ? { pinned: f.pinned.checked } : {}) };
     if (!fields.title.trim() && !fields.body.trim()) return;
-    if (f.dataset.id) await update('notes', f.dataset.id, fields);
-    else await save('notes', newRecord('notes', ctx(), { ...fields }));
-    state.editing = null; render();
+    let id = f.dataset.id;
+    if (id) await update('notes', id, fields);
+    else { const n = newRecord('notes', ctx(), { ...fields }); id = n.id; await save('notes', n); }
+    saved(id);
   },
   'save-contact': async (f) => {
     const birthday = f.birthday.value.trim() ? parseDayMonth(f.birthday.value) : null;
@@ -656,17 +760,19 @@ const forms = {
       name: f.name.value, birthday, birthYear: Number(f.birthYear.value) || null, phone: f.phone.value,
       email: f.email.value, address: f.address.value, note: f.note.value,
     };
-    if (f.dataset.id) await update('contacts', f.dataset.id, fields);
-    else await save('contacts', newRecord('contacts', ctx(), { ...fields }));
-    state.editing = null; render();
+    let id = f.dataset.id;
+    if (id) await update('contacts', id, fields);
+    else { const c = newRecord('contacts', ctx(), { ...fields }); id = c.id; await save('contacts', c); }
+    saved(id);
   },
   'add-gift': async (f) => {
     const extra = f.extra.value.trim(); const isLink = /^https?:\/\/\S+$/.test(extra);
-    await save('gifts', newRecord('gifts', ctx(), {
+    const g = newRecord('gifts', ctx(), {
       forName: f.forName.value, title: f.title.value, link: isLink ? extra : null, note: isLink ? null : extra,
       private: f.private.checked, owner: state.session?.user.id || null,
-    }));
-    render('form[data-form="add-gift"] [name="title"]');
+    });
+    await save('gifts', g);
+    saved(g.id);
   },
   'add-template-item': async (f) => {
     const chosen = f.category.value;
@@ -725,7 +831,7 @@ root.addEventListener('keydown', (e) => {
 let swipe = null;
 root.addEventListener('touchstart', (e) => {
   const row = e.target.closest('[data-swipe]');
-  if (!row || e.touches.length > 1 || e.target.closest('select, button, input:not([type="checkbox"]), textarea')) { swipe = null; return; }
+  if (!row || e.touches.length > 1 || e.target.closest('select, button:not(.open), input:not([type="checkbox"]), textarea')) { swipe = null; return; }
   swipe = { row, x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, on: false, armed: 0 };
 }, { passive: true });
 root.addEventListener('touchmove', (e) => {
@@ -815,6 +921,7 @@ async function start() {
   state.setup = (await store.getMeta('setupPending')) === true;
   hintMeta = { ...hintMeta, ...((await store.getMeta('hints')) || {}) };
   await ensureLists();
+  history.replaceState({ ...view(), depth: 0 }, '');
   if (sessionStorage.getItem('hm-updated')) { sessionStorage.removeItem('hm-updated'); flash(MSG.newVersion); }
   render();
   keepData();

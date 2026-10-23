@@ -52,9 +52,10 @@ code { font:14px var(--font-label); background:var(--sunken); padding:2px 6px; b
 .apphead .iconbtn[aria-current] { color:var(--accent-text); }
 .sync[data-status="error"], .sync[data-status="auth"] { color:var(--err); }
 
-.tabbar { position:fixed; z-index:20; left:0; right:0; bottom:0; background:var(--bg); border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom, 0px); }
+/* Unten nur so viel Platz wie der Home-Strich des iPhones wirklich braucht, die Symbole sitzen tiefer. */
+.tabbar { position:fixed; z-index:20; left:0; right:0; bottom:0; background:var(--bg); border-top:1px solid var(--line); padding-bottom:max(0px, calc(env(safe-area-inset-bottom, 0px) - 16px)); }
 .tabbar [role="tablist"] { display:flex; justify-content:space-around; }
-.tabbar [role="tab"] { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; min-height:calc(var(--tap) + 12px); padding:6px 0 4px; border:0; background:transparent; color:var(--muted); font:400 12px/1 var(--font-label); letter-spacing:.01em; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.tabbar [role="tab"] { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; min-height:calc(var(--tap) + 8px); padding:6px 0 2px; border:0; background:transparent; color:var(--muted); font:400 12px/1 var(--font-label); letter-spacing:.01em; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 .tabbar [role="tab"] svg { width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
 .tabbar [role="tab"]::after { content:""; width:4px; height:4px; border-radius:50%; background:transparent; }
 .tabbar [role="tab"]:hover { color:var(--ink); }
@@ -324,3 +325,57 @@ button.item.done .t > b { color:var(--faint); text-decoration:line-through; }
 .mday i { display:flex; gap:3px; height:5px; }
 .mday i b { width:5px; height:5px; border-radius:50%; background:var(--accent); }
 .mday:hover span { background:var(--sunken); } .mday[aria-pressed="true"]:hover span { background:var(--ink); }
+
+/* ---------- Übersicht: Zurück, Schnelleingabe, Einstellungen, Hinweise ---------- */
+.backlink { display:inline-flex; align-items:center; gap:2px; margin:var(--s3) 0 calc(var(--s4) * -1) calc(var(--s2) * -1); padding:0 var(--s2) 0 0; min-height:40px; border:0; background:transparent; color:var(--muted); font-size:13px; cursor:pointer; border-radius:var(--r-control); }
+.backlink:hover { color:var(--ink); background:var(--sunken); }
+.backlink svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
+.apphead .sync { border:0; background:transparent; font-family:var(--font-label); cursor:pointer; padding:var(--s2) 0; }
+.apphead .sync:hover { color:var(--ink); }
+
+/* Einstellungen unter „mehr“: eingeklappt, rechts der Stand */
+.settings details.setting { margin:0; }
+.settings details.setting:first-of-type { border-top:0; }
+.setting > summary { font-size:14px; color:var(--ink); }
+.setting > summary > span:first-child { flex:none; }
+.setting > summary .sum { flex:1; min-width:0; margin-left:auto; text-align:right; color:var(--faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-transform:none; }
+.setting > div { padding:0 0 var(--s4); }
+.needs { display:block; font-style:normal; color:var(--warn); }
+
+/* Termin: weitere Angaben eingeklappt */
+.more-fields { margin:0; }
+.more-fields > div.editor { padding-top:0; }
+
+/* Hinweise klein unter dem Tag */
+.hintline { border-top:1px solid var(--line); margin:var(--s5) 0 0; padding:var(--s3) 0 0; }
+.hintline p { margin:0; font-size:14px; color:var(--muted); }
+.hintline p .cap { color:var(--accent-text); margin-right:var(--s2); }
+.hintline .actions-row { margin:var(--s2) 0 0; }
+
+/* Text antippen öffnet die Zeile zum Bearbeiten, der Kreis hakt ab */
+.check.box { flex:none; padding-right:var(--s1); }
+button.t.open { flex:1; min-width:0; min-height:var(--tap); display:flex; flex-direction:column; justify-content:center; padding:0; border:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.item:has(> .check.box input:checked) .t > b { color:var(--faint); text-decoration:line-through; }
+button.t.open[aria-expanded="true"] > b { font-weight:600; }
+
+/* Einkauf im Laden: dichter, damit mehr auf einen Blick passt */
+.section.compact .group { padding-top:var(--s4); }
+.section.compact .item { min-height:44px; padding:2px 0; }
+.section.compact .check, .section.compact button.t.open { min-height:44px; }
+
+.tag.late { border-color:var(--err); color:var(--err); }
+
+/* Gerade gespeichert: kurz hervorheben */
+.fresh { animation:fresh 1.6s ease-out; }
+@keyframes fresh { 0%, 30% { background:var(--accent-tint); } 100% { background:transparent; } }
+@media (prefers-reduced-motion: reduce) { .fresh { animation:none; background:var(--accent-tint); } }
+
+/* Listenname als Überschrift; darüber liegt unsichtbar die Auswahl (wählen, umbenennen, neu) */
+.listpick { position:relative; display:inline-flex; align-items:center; gap:4px; margin-right:auto; min-width:0; min-height:var(--tap); font:600 clamp(24px,7vw,32px)/1.1 var(--font-title); letter-spacing:-.015em; text-transform:lowercase; cursor:pointer; }
+.listpick .name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.listpick svg { flex:none; width:22px; height:22px; stroke:var(--muted); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.listpick select { position:absolute; inset:0; width:100%; opacity:0; font-size:16px; cursor:pointer; }
+.listpick:focus-within { outline:2px solid var(--accent-text); outline-offset:2px; border-radius:var(--r-control-s); }
+.toast.flash { padding:var(--s3) var(--s4); }
+.section.compact { margin:0; }
+.section.compact .group { padding:var(--s3) 0 0; }
