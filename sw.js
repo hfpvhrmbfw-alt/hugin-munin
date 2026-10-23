@@ -1,7 +1,7 @@
 // Service Worker: App-Hülle offline verfügbar machen. Daten laufen nie über den Cache.
 // Programm und Stil kommen zuerst frisch vom Netz (neue Versionen sind sofort da), nur offline aus dem Speicher.
 // Schriften und Bilder ändern sich selten: die kommen aus dem Speicher und werden im Hintergrund nachgeladen.
-const VERSION = 'hm-16';
+const VERSION = 'hm-17';
 const SHELL = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'src/main.js', 'src/model.js', 'src/logic.js', 'src/storage.js', 'src/sync.js', 'src/texts.js', 'src/ui.js', 'src/raven.js',
