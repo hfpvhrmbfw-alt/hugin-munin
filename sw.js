@@ -1,13 +1,13 @@
 // Service Worker: App-Hülle offline verfügbar machen. Daten laufen nie über den Cache.
 // Programm und Stil kommen zuerst frisch vom Netz (neue Versionen sind sofort da), nur offline aus dem Speicher.
 // Schriften und Bilder ändern sich selten: die kommen aus dem Speicher und werden im Hintergrund nachgeladen.
-const VERSION = 'hm-17';
+const VERSION = 'hm-18';
 const SHELL = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'src/main.js', 'src/model.js', 'src/logic.js', 'src/storage.js', 'src/sync.js', 'src/texts.js', 'src/ui.js', 'src/raven.js',
   'fonts/asap.woff2', 'fonts/chivo-mono.woff2', 'icons/favicon.png', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png',
   ...['shopping', 'tasks', 'calendar', 'today', 'notes', 'contacts', 'gifts', 'projects', 'search'].flatMap((m) => [`icons/rabe-${m}.png`, `icons/rabe-${m}-rand.png`]),
-  ...['kopf', 'sitzt', 'fliegt', 'huepft', 'schlaeft', 'zwei', 'schaut', 'traegt', 'landet'].map((m) => `icons/mini-${m}.png`),
+  ...['kopf', 'fliegt', 'schlaeft', 'zwei', 'schaut', 'traegt'].map((m) => `icons/mini-${m}.png`),
 ];
 
 self.addEventListener('install', (e) => {

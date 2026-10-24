@@ -1,6 +1,6 @@
 // Oberfläche: Zustand der Ansicht und Rendering. Formatiert Daten aus der Logik zu Text und HTML.
 // Aufbau nach Castra · Blei (mobil): .app > .apphead, main.wrap (.bigtitle, .item …), .tabbar
-import { SHOPPING_CATEGORIES, REPEATS, MODULES, STORAGE_MODES, MEAL_SLOTS, CHORE_UNITS, GIFT_STATUS as GIFT_STATUSES, DEFAULT_PORT } from './model.js';
+import { SHOPPING_CATEGORIES, REPEATS, MODULES, STORAGE_MODES, MEAL_SLOTS, CHORE_UNITS, GIFT_STATUS as GIFT_STATUSES } from './model.js';
 import {
   groupShopping, sortTasks, itemsOf, overview, agenda, addDays, alive, tabLayout, addressFields, choreState, balances,
   settleUp, monthTotal, upcomingBirthdays, nextBirthday, mealWeek, pinnedNotes, visibleGifts, progress, weekStart,
@@ -19,7 +19,7 @@ const fmtTime = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-d
 const fmtRange = new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'numeric', timeZone: 'UTC' });
 const fmtMonth = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 const fmtMoney = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
-export const money = (cents) => fmtMoney.format(cents / 100);
+const money = (cents) => fmtMoney.format(cents / 100);
 const dayMonth = (mmdd) => `${Number(mmdd.slice(3))}.${Number(mmdd.slice(0, 2))}.`;
 const asDate = (iso) => new Date(iso + 'T00:00:00Z');
 
@@ -32,7 +32,7 @@ export function dayLabel(iso, today, long = false) {
 }
 
 /** Überschrift eines Tages: immer mit Datum, „heute“/„morgen“/„gestern“ davor und heute hervorgehoben. */
-export function dayHead(iso, today) {
+function dayHead(iso, today) {
   const date = fmtDay.format(asDate(iso));
   const rel = [addDays(today, -1), today, addDays(today, 1)].indexOf(iso);
   return `<h2 class="cap group${rel === 1 ? ' is-today' : ''}">${rel < 0 ? esc(date) : `${['gestern', 'heute', 'morgen'][rel]} · ${esc(date)}`}</h2>`;
@@ -104,7 +104,7 @@ const iconBtn = (name, label, data) => `<button class="iconbtn" type="button" ar
 // ---- Rahmen ------------------------------------------------------------------
 
 /** Tab, der wirklich gezeigt wird: ausgeschaltete Module fallen auf "Heute" zurück. */
-export function currentTab(state) {
+function currentTab(state) {
   return ['today', 'more', 'search'].includes(state.tab) || on(state, state.tab) ? state.tab : 'today';
 }
 
@@ -815,34 +815,20 @@ function renderTemplates(state) {
  * Auswahl des Speicherorts mit den passenden Feldern. Felder anderer Speicherorte sind ausgeblendet
  * und abgeschaltet, damit nur die gewählten abgeschickt werden.
  */
-const COMMON_STORAGE = ['local', 'tailscale'];
-
 function storageFields(state, mode, setup = false) {
   const f = addressFields(mode, state.settings.serverUrl || state.defaultServer);
   const showIf = (modes) => (modes.split(' ').includes(mode) ? '' : 'hidden disabled');
-  // Die zwei üblichen Wege stehen offen da, die übrigen eingeklappt (für Bastler).
-  const radio = (m) => `<label class="choice"><input type="radio" name="storage" value="${m}" data-action="pick-storage" ${m === mode ? 'checked' : ''}>
-    <span class="t"><b>${esc(STORAGE[m][0])}</b><span>${esc(STORAGE[m][1])}</span></span></label>`;
-  const rare = STORAGE_MODES.filter((m) => !COMMON_STORAGE.includes(m));
-  const radios = COMMON_STORAGE.map(radio).join('')
-    + `<details class="other-ways"${rare.includes(mode) ? ' open' : ''}><summary>andere wege</summary><div>${rare.map(radio).join('')}</div></details>`;
-  const port = (v) => `<label class="field"><span class="cap">port</span><input name="port" inputmode="numeric" value="${attr(v)}" placeholder="${DEFAULT_PORT}"></label>`;
-  const mixed = state.pageProtocol === 'https:' ? `<div class="note"><span class="cap">achtung</span>${esc(MSG.mixedContent)}</div>` : '';
+  const radios = STORAGE_MODES.map((m) => `<label class="choice"><input type="radio" name="storage" value="${m}" data-action="pick-storage" ${m === mode ? 'checked' : ''}>
+    <span class="t"><b>${esc(STORAGE[m][0])}</b><span>${esc(STORAGE[m][1])}</span></span></label>`).join('');
   return `<fieldset class="choices"><legend class="cap">wo sollen eure daten liegen?</legend>${radios}</fieldset>
   <fieldset class="fields" data-modes="tailscale" ${showIf('tailscale')}>
-    <div class="pair"><label class="field"><span class="cap">gerätename</span><input name="host" autocomplete="off" autocapitalize="none" placeholder="macmini" value="${attr(mode === 'tailscale' ? f.host : '')}" required></label>
+    <div class="pair"><label class="field"><span class="cap">gerätename</span><input name="host" autocomplete="off" autocapitalize="none" placeholder="hugin-munin" value="${attr(mode === 'tailscale' ? f.host : '')}" required></label>
       <label class="field"><span class="cap">tailnet</span><input name="tailnet" autocomplete="off" autocapitalize="none" placeholder="tail1234.ts.net" value="${attr(f.tailnet)}"></label></div>
-    <p class="empty small">Steht in der Tailscale-App beim Mac mini, z. B. macmini.tail1234.ts.net. Auf dem Mac: <code>tailscale serve --bg 8090</code>.</p></fieldset>
-  <fieldset class="fields" data-modes="wireguard" ${showIf('wireguard')}>
-    <div class="pair"><label class="field"><span class="cap">adresse im tunnel</span><input name="host" autocomplete="off" autocapitalize="none" placeholder="10.8.0.1" value="${attr(mode === 'wireguard' ? f.host : '')}" required></label>${port(mode === 'wireguard' ? f.port : DEFAULT_PORT)}</div>
-    <p class="empty small">IP des Mac mini im WireGuard-Netz. Den Tunnel baut die WireGuard-App auf, die Schlüssel bleiben dort.</p>${mixed}</fieldset>
-  <fieldset class="fields" data-modes="lan" ${showIf('lan')}>
-    <div class="pair"><label class="field"><span class="cap">adresse im heimnetz</span><input name="host" autocomplete="off" autocapitalize="none" placeholder="macmini.local" value="${attr(mode === 'lan' ? f.host : '')}" required></label>${port(mode === 'lan' ? f.port : DEFAULT_PORT)}</div>
-    <p class="empty small">Name oder IP des Mac mini, z. B. macmini.local oder 192.168.178.20.</p>${mixed}</fieldset>
-  <fieldset class="fields" data-modes="domain hosted" ${showIf('domain hosted')}>
-    <label class="field"><span class="cap">adresse</span><input name="url" type="url" autocomplete="off" autocapitalize="none" placeholder="https://planer.example.de" value="${attr(mode === 'domain' || mode === 'hosted' ? f.url : '')}" required></label>
-    <p class="empty small">Nur mit https. Der Server ist dann aus dem Internet erreichbar: starkes Passwort und nach dem Anlegen eurer Konten die Registrierung sperren (siehe Anleitung Mac mini).</p></fieldset>
-  <fieldset class="fields" data-modes="tailscale wireguard lan domain hosted" ${showIf('tailscale wireguard lan domain hosted')}>
+    <p class="empty small">Zeigt die Mac-App im Rabenmenü, z. B. hugin-munin.tail1234.ts.net.</p></fieldset>
+  <fieldset class="fields" data-modes="domain" ${showIf('domain')}>
+    <label class="field"><span class="cap">adresse</span><input name="url" type="url" autocomplete="off" autocapitalize="none" placeholder="https://planer.example.de" value="${attr(mode === 'domain' ? f.url : '')}" required></label>
+    <p class="empty small">Nur mit https. Der Server ist dann aus dem Internet erreichbar: starkes Passwort und nach dem Anlegen eurer Konten die Registrierung sperren (siehe Anleitung Mac-App).</p></fieldset>
+  <fieldset class="fields" data-modes="tailscale domain" ${showIf('tailscale domain')}>
     <label class="field"><span class="cap">e-mail</span><input name="email" type="email" autocomplete="username" required></label>
     <label class="field"><span class="cap">passwort</span><input name="password" type="password" autocomplete="current-password" minlength="8" required></label>
     <label class="field"><span class="cap">dein name (nur bei neuem konto)</span><input name="name" autocomplete="nickname"></label>
@@ -875,7 +861,7 @@ function renderSetup(state) {
       <fieldset class="choices"><legend class="cap">was braucht ihr? (später unter „mehr“ änderbar)</legend>${moduleChecks(state, true)}</fieldset>
       <fieldset class="fields" data-modes="local" ${mode === 'local' ? '' : 'hidden disabled'}>
         <div class="actions"><button class="btn primary" type="submit" name="mode" value="local">Los geht's</button></div></fieldset>
-      <fieldset class="fields" data-modes="tailscale wireguard lan domain hosted" ${mode === 'local' ? 'hidden disabled' : ''}>${accountButtons}</fieldset>
+      <fieldset class="fields" data-modes="tailscale domain" ${mode === 'local' ? 'hidden disabled' : ''}>${accountButtons}</fieldset>
     </form>
   </main></div>`;
 }

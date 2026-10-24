@@ -1,6 +1,6 @@
 # Mac-App „Hugin & Munin“
 
-Die Mac-App ersetzt die Terminal-Schritte aus [MAC-MINI.md](MAC-MINI.md). Sie sitzt als Rabe in der Menüleiste, bringt den Server mit und hat Tailscale eingebaut. Auf dem Mac braucht es keine Tailscale-App mehr.
+Die Mac-App macht den Mac mini zum Server für Hugin & Munin. Sie sitzt als Rabe in der Menüleiste, bringt den Server mit und hat Tailscale eingebaut. Auf dem Mac braucht es keine Tailscale-App mehr.
 
 ## Was drin ist
 
@@ -9,8 +9,6 @@ Die Mac-App ersetzt die Terminal-Schritte aus [MAC-MINI.md](MAC-MINI.md). Sie si
 | Server `hm-server` | `mac/server/` (Go) | PocketBase mit `server/pb_migrations`, `server/pb_hooks` und der PWA, dazu Tailscale über `tsnet`. Der Server ist selbst ein Gerät im Tailnet und hat eine eigene HTTPS-Adresse. Er verschickt auch die Erinnerungen (siehe unten). |
 | Oberfläche | `mac/app/` (SwiftUI) | Startet den Server, startet ihn nach einem Absturz neu, hält den Mac wach, zeigt Zustand, Adresse als QR-Code, letzte Sicherung. |
 | Bauen | `mac/build-app.sh` | Baut `Hugin & Munin.app` und ein ZIP nach `mac/dist/`. GitHub baut es bei jeder Änderung (Actions → „Mac-App“ → Artefakt `HuginMunin-mac`). |
-
-Server und Abgleich sind dieselben wie bisher. Die PWA merkt keinen Unterschied.
 
 ## Einrichten
 
@@ -24,19 +22,16 @@ Server und Abgleich sind dieselben wie bisher. Die PWA merkt keinen Unterschied.
 
 Den Ruhezustand verhindert die App selbst, solange sie läuft. „Nach Stromausfall automatisch starten“ (Systemeinstellungen → Energie) bleibt sinnvoll.
 
-## Umzug von der Terminal-Einrichtung
+## Handys und Partner
 
-Gibt es `~/hugin-munin-server/pb_data`, nimmt die App genau diese Daten. Sonst legt sie neue unter `~/Library/Application Support/Hugin & Munin/` an.
+1. Auf dem Handy die Tailscale-App installieren und mit demselben Konto anmelden.
+2. Adresse aus der Mac-App (oder QR-Code) in Safari öffnen, dann Teilen → „Zum Home-Bildschirm“.
+3. Bei der Einrichtung „mac mini über tailscale“ wählen, Module ankreuzen, Konto anlegen, danach unter **Mehr** den Haushalt gründen.
+4. Partner: in der Tailscale-Verwaltung einladen (Users → Invite) oder nur das Gerät `hugin-munin` freigeben (Machines → Share). Er installiert die Tailscale-App, legt in Hugin & Munin ein Konto an und tritt mit dem Einladungscode bei.
 
-Vorher den alten Dienst und die alte Weiterleitung abschalten, sonst ist Port 8090 belegt:
+Danach in der PocketBase-Verwaltung (`https://hugin-munin.<name>.ts.net/_/`) bei der Sammlung **users** die „Create rule“ auf „Superusers only“ stellen, damit niemand weiteres ein Konto anlegen kann.
 
-```sh
-sudo launchctl bootout system/de.huginmunin.pocketbase
-sudo rm /Library/LaunchDaemons/de.huginmunin.pocketbase.plist
-tailscale serve reset
-```
-
-Die Adresse ändert sich auf den neuen Gerätenamen. In der App auf den Handys unter **Mehr** die neue Serveradresse eintragen und neu anmelden. Die Daten bleiben.
+Die genauen Menüs können sich bei Tailscale ändern; maßgeblich ist deren Dokumentation.
 
 ## Erinnerungen (Push)
 
@@ -51,11 +46,11 @@ Auf dem iPhone kommen Mitteilungen nur, wenn die App vom Home-Bildschirm geöffn
 
 ## Sicherung
 
-Jede Nacht um 3 Uhr legt der Server eine Sicherung an und behält die letzten 14 (Einstellung aus der Migration, in der PocketBase-Verwaltung unter Settings → Backups änderbar).
+Jede Nacht um 3 Uhr legt der Server eine Sicherung an und behält die letzten 14 (Einstellung aus der Migration, in der PocketBase-Verwaltung unter Settings → Backups änderbar). Zusätzlich ab und zu in der App unter **Mehr → Sicherung speichern**.
 
 ## Ordner
 
-- Daten: `~/hugin-munin-server/pb_data` oder `~/Library/Application Support/Hugin & Munin/pb_data`
+- Daten: `~/Library/Application Support/Hugin & Munin/pb_data`
 - Sicherungen: `<Daten>/backups` (Time Machine sichert mit)
 - Tailscale-Zustand: `~/Library/Application Support/Hugin & Munin/tailscale`
 - Protokoll: `~/Library/Logs/Hugin & Munin/server.log`

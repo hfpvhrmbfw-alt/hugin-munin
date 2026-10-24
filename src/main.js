@@ -4,7 +4,7 @@ import {
   DEFAULT_SETTINGS, COLLECTIONS, SANITIZERS,
 } from './model.js';
 import {
-  splitQuickAdd, itemsOf, serverAddress, addressWarning, guessStorage, fromTemplate, parseAmount, parseDayMonth,
+  splitQuickAdd, itemsOf, serverAddress, fromTemplate, parseAmount, parseDayMonth,
   shoppingHistory, parseIcs, icsName, addDays, alive, guessCategory, parseQuickWhen, dayNumber,
 } from './logic.js';
 import * as storage from './storage.js';
@@ -44,7 +44,6 @@ const state = {
   today: localToday(),
   setup: false, // Einrichtung beim ersten Start
   setupMode: 'local', // gewählter Speicherort im Formular
-  pageProtocol: location.protocol,
   // Wurde die App direkt vom Server geöffnet (z. B. über Tailscale), ist das die Serveradresse. GitHub Pages ist kein Server.
   defaultServer: /^https?:$/.test(location.protocol) && !location.hostname.endsWith('github.io') && !['localhost', '127.0.0.1'].includes(location.hostname) ? location.origin : '',
 };
@@ -224,9 +223,8 @@ async function chooseStorage(f, submitter) {
   const fd = new FormData(f);
   const mode = fd.get('storage') || 'local';
   if (mode === 'local') { await saveSettings({ storage: 'local' }); return true; }
-  const addr = serverAddress(mode, { host: fd.get('host'), tailnet: fd.get('tailnet'), port: fd.get('port'), url: fd.get('url') });
+  const addr = serverAddress(mode, { host: fd.get('host'), tailnet: fd.get('tailnet'), url: fd.get('url') });
   if (!addr.ok) { alert(ADDRESS_ERROR[addr.error]); return false; }
-  if (addressWarning(addr.url, location.protocol) === 'mixed') { alert(`${MSG.mixedContent}\n\n${addr.url}`); return false; }
   const c = createClient(addr.url);
   const email = String(fd.get('email') || ''); const password = String(fd.get('password') || '');
   try {
@@ -904,9 +902,9 @@ async function keepData() {
 // ---- Start -----------------------------------------------------------------------
 
 async function start() {
-  store = await storage.open();
+  store = await storage.open().catch(() => { throw new Error(MSG.noStorage); });
   const savedSettings = await store.getMeta('settings');
-  state.settings = sanitizeSettings(savedSettings || { ...DEFAULT_SETTINGS, storage: guessStorage(state.defaultServer), serverUrl: state.defaultServer });
+  state.settings = sanitizeSettings(savedSettings || { serverUrl: state.defaultServer });
   state.setupMode = state.settings.storage;
   state.householdId = (await store.getMeta('household')) || rid();
   await store.setMeta('household', state.householdId);
@@ -946,4 +944,4 @@ async function start() {
   refreshFeeds();
 }
 
-start().catch((err) => { root.textContent = String(err); });
+start().catch((err) => { root.textContent = err.message || String(err); });

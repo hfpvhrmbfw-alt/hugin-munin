@@ -67,8 +67,8 @@ Beim Import werden neuere Versionen abgelehnt, ältere über `upgradeRaw` angeho
 
 ## Einstellungen (nur auf dem Gerät)
 
-`theme`, `serverUrl`, `storage` (`local`, `tailscale`, `wireguard`, `lan`, `domain`, `hosted`), `modules` (eingeschaltete Module aus `MODULES`). Version 1 kannte `storage` und `modules` noch nicht: `storage` wird aus der Adresse abgeleitet, `modules` sind dann Einkauf, Aufgaben, Kalender.
+`theme`, `serverUrl`, `storage` (`local`, `tailscale`, `domain` = andere Adresse; frühere Werte wie `wireguard` oder `hosted` werden zu `domain`), `modules` (eingeschaltete Module aus `MODULES`). Version 1 kannte `storage` und `modules` noch nicht: `storage` wird aus der Adresse abgeleitet, `modules` sind dann Einkauf, Aufgaben, Kalender.
 
 ## Version 1 → 2
 
-Sicherungen der Version 1 werden beim Import hochgehoben (neue Sammlungen leer). IndexedDB bekommt in Version 2 die neuen Speicher dazu. Auf dem Server legt `server/pb_migrations/1761000000_modules.js` die neuen Sammlungen an. Ein noch nicht aktualisierter Server stört den Abgleich nicht: fehlende Sammlungen werden übersprungen und später nachgeholt.
+Sicherungen der Version 1 werden beim Import hochgehoben (neue Sammlungen leer). IndexedDB bekommt in Version 2 die neuen Speicher dazu. Auf dem Server legt `server/pb_migrations/1760000000_init.js` alle Sammlungen an. Fehlt einem Server eine Sammlung, stört das den Abgleich nicht: sie wird übersprungen und später nachgeholt.

@@ -15,7 +15,7 @@ Familienplaner für zwei, benannt nach Odins Raben „Gedanke“ und „Erinneru
 ## Version 2: Einrichtung, Speicherort, Module
 
 - **Einrichtung beim ersten Start:** Speicherort wählen und Module ankreuzen. Beides lässt sich später unter **Mehr** ändern.
-- **Speicherort:** nur auf dem Gerät, eigener Server über Tailscale, über WireGuard, im Heimnetz, mit eigener Domain oder gemieteter Server. Je nach Wahl erscheinen die passenden Felder (Gerätename und Tailnet, IP und Port, Adresse) und die Anmeldung. Tunnel und Schlüssel (Tailscale, WireGuard) verwaltet die jeweilige VPN-App, nicht Hugin & Munin. Eine http-Adresse (WireGuard, Heimnetz) geht nur, wenn die App selbst über http vom Server geöffnet wird, nicht über GitHub Pages.
+- **Speicherort:** nur auf dem Gerät, der Mac mini über Tailscale (mit der [Mac-App](docs/MAC-APP.md)) oder eine andere https-Adresse. Den Tunnel verwaltet die Tailscale-App, nicht Hugin & Munin.
 - **Module** (an/aus, Ausgeschaltetes verschwindet überall, die Daten bleiben): Einkauf, Aufgaben, Kalender, Essensplan, Haushaltsplan im Wechsel, Ausgaben mit „wer schuldet wem“, Projekte, Notizen, Pinnwand, Kontakte & Geburtstage, Geschenkideen (auf Wunsch nur für dich sichtbar, auch auf dem Server), Listen-Vorlagen. Unten stehen Heute, die ersten drei Module und Mehr; weitere Module stehen unter Mehr → Bereiche.
 
 ## Version 3: Feinschliff, fremde Kalender, Erinnerungen
@@ -38,16 +38,16 @@ Familienplaner für zwei, benannt nach Odins Raben „Gedanke“ und „Erinneru
 |---|---|---|
 | `src/model.js` | Modell | Typen, Stammdaten-IDs, Prüfung (`sanitize…`), Export/Import, Migration |
 | `src/logic.js` | Logik | reine Funktionen: Wiederholungen, Tagesplan, Sortierung, Zusammenführen beim Abgleich, Serveradresse, Haushaltsplan, Salden, Geburtstage, Vorlagen |
-| `src/storage.js` | Speicher | IndexedDB, Ersatz localStorage |
+| `src/storage.js` | Speicher | IndexedDB |
 | `src/sync.js` | Dienst | PocketBase: Anmeldung, Haushalt, Hoch- und Herunterladen, Live-Updates |
 | `src/texts.js` | Texte | Beschriftungen und Meldungen |
 | `src/ui.js`, `src/main.js` | Oberfläche | Rendering, Aktionen, Start; einzige Stelle mit Uhr und Zufall |
-| `server/` | Server | PocketBase-Migration (Sammlungen, Regeln), Hook für Beitritt und Mitglieder, Startdatei für macOS |
+| `server/` | Server | PocketBase-Migration (Sammlungen, Regeln), Hooks für Beitritt, fremde Kalender und Kalender-Abo |
 | `mac/` | Mac-App | Server mit eingebautem Tailscale und Push-Erinnerungen (Go) und Menüleisten-App (SwiftUI), siehe [Mac-App](docs/MAC-APP.md) |
 
 Abhängigkeiten zeigen nur nach innen: Oberfläche → Logik/Speicher/Dienst → Modell.
 
-Mehr dazu: [Datenmodell](docs/DATENMODELL.md) · [Mac mini einrichten](docs/MAC-MINI.md) · [Mac-App](docs/MAC-APP.md) · [Weg nach Swift](docs/SWIFT.md)
+Mehr dazu: [Datenmodell](docs/DATENMODELL.md) · [Mac-App (Server auf dem Mac mini)](docs/MAC-APP.md)
 
 ## Ausprobieren
 
@@ -64,7 +64,7 @@ Mit Abgleich: PocketBase herunterladen (https://pocketbase.io, getestet mit 0.40
   --migrationsDir=server/pb_migrations --hooksDir=server/pb_hooks
 ```
 
-Dann http://127.0.0.1:8090 öffnen, unter **Mehr** ein Konto anlegen und einen Haushalt gründen. Ein zweites Browserfenster (privat) spielt den Partner.
+Dann http://127.0.0.1:8090 öffnen, als Speicherort „andere adresse“ mit `http://127.0.0.1:8090` wählen, ein Konto anlegen und einen Haushalt gründen. Ein zweites Browserfenster (privat) spielt den Partner.
 
 ## Tests
 

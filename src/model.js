@@ -1,7 +1,7 @@
 // Datenmodell: Typen, Stammdaten, leere Einträge, Validierung, Export/Import, Migration.
 // Keine Abhängigkeiten, keine Anzeigetexte, keine Uhr.
 
-export const APP_ID = 'hugin-munin';
+const APP_ID = 'hugin-munin';
 export const SCHEMA_VERSION = 3;
 
 /** Sammlungen, die mit dem Server abgeglichen werden (gleiche Namen wie in PocketBase). */
@@ -18,18 +18,17 @@ export const MODULES = [
   'shopping', 'tasks', 'calendar', 'meals', 'chores', 'expenses', 'projects', 'notes', 'board', 'contacts', 'gifts', 'templates',
 ];
 export const TAB_MODULES = MODULES.filter((m) => m !== 'board');
-export const DEFAULT_MODULES = ['shopping', 'tasks', 'calendar'];
+const DEFAULT_MODULES = ['shopping', 'tasks', 'calendar'];
 
 /**
- * Wo die Daten liegen. local = nur auf dem Gerät; alle anderen = eigener PocketBase-Server,
- * unterschiedlich erreicht (Tailscale, WireGuard-Tunnel, Heimnetz, eigene Domain, gemieteter Server).
+ * Wo die Daten liegen. local = nur auf dem Gerät, tailscale = Mac mini mit der Mac-App,
+ * domain = ein anderer PocketBase-Server mit https-Adresse.
  */
-export const STORAGE_MODES = ['local', 'tailscale', 'wireguard', 'lan', 'domain', 'hosted'];
-export const DEFAULT_PORT = 8090;
+export const STORAGE_MODES = ['local', 'tailscale', 'domain'];
 
 export const MEAL_SLOTS = ['breakfast', 'lunch', 'dinner'];
 export const CHORE_UNITS = ['daily', 'weekly', 'monthly'];
-export const EXPENSE_KINDS = ['expense', 'settle'];
+const EXPENSE_KINDS = ['expense', 'settle'];
 export const GIFT_STATUS = ['idea', 'bought', 'given'];
 
 /** Reihenfolge = Reihenfolge im Laden und bei Gleichstand. */
@@ -43,7 +42,7 @@ export const REPEATS = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
 export const COLORS = ['orange', 'ink', 'olive', 'sky', 'plum', 'sand'];
 
 const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
-export const ID_LENGTH = 15; // PocketBase-Format: 15 Zeichen a-z0-9
+const ID_LENGTH = 15; // PocketBase-Format: 15 Zeichen a-z0-9
 
 /**
  * Neue ID im PocketBase-Format. Zufall kommt von außen (crypto.getRandomValues in der UI).
@@ -62,10 +61,10 @@ const ID_RE = /^[a-z0-9]{15}$/;
 
 export const isIsoDate = (v) => typeof v === 'string' && ISO_DATE.test(v) && !Number.isNaN(Date.parse(v + 'T00:00:00Z'))
   && new Date(v + 'T00:00:00Z').toISOString().slice(0, 10) === v;
-export const isTime = (v) => typeof v === 'string' && HHMM.test(v);
+const isTime = (v) => typeof v === 'string' && HHMM.test(v);
 export const isId = (v) => typeof v === 'string' && ID_RE.test(v);
 /** Tag im Jahr ohne Jahr, 'MM-DD' (29.02. erlaubt). */
-export const isMonthDay = (v) => typeof v === 'string' && /^\d{2}-\d{2}$/.test(v) && isIsoDate('2000-' + v);
+const isMonthDay = (v) => typeof v === 'string' && /^\d{2}-\d{2}$/.test(v) && isIsoDate('2000-' + v);
 
 const str = (v, max = 500) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const optStr = (v, max = 500) => { const s = str(v, max); return s === '' ? null : s; };
@@ -278,14 +277,14 @@ export const SANITIZERS = {
 
 /** Lokale Einstellungen (werden nicht abgeglichen, gelten je Gerät). */
 export const DEFAULT_SETTINGS = { theme: 'system', serverUrl: '', storage: 'local', modules: DEFAULT_MODULES };
-export const THEMES = ['system', 'light', 'dark'];
+const THEMES = ['system', 'light', 'dark'];
 
 const cleanUrl = (v) => (typeof v === 'string' && /^https?:\/\/\S+$/.test(v.trim()) ? v.trim().replace(/\/+$/, '') : '');
 
 export function sanitizeSettings(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
   const serverUrl = cleanUrl(r.serverUrl);
-  // Einstellungen aus Version 1 haben noch keinen Speicherort: aus der Adresse ableiten.
+  // Ohne (oder mit altem) Speicherort aus der Adresse ableiten. Frühere Wege wie wireguard oder hosted gelten als „andere adresse“.
   const storage = STORAGE_MODES.includes(r.storage) ? r.storage
     : serverUrl ? (/\.ts\.net$/i.test(serverUrl) ? 'tailscale' : 'domain') : 'local';
   const modules = Array.isArray(r.modules) ? MODULES.filter((m) => r.modules.includes(m)) : [...DEFAULT_MODULES];
