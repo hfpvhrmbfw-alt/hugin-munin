@@ -41,7 +41,9 @@ func (t *tailnet) start(handler http.Handler, logger *slog.Logger) error {
 	if t.srv == nil {
 		return nil
 	}
-	t.srv.UserLogf = func(format string, args ...any) { logger.Info("tailscale: " + strings.TrimSpace(fmt.Sprintf(format, args...))) }
+	t.srv.UserLogf = func(format string, args ...any) {
+		logger.Info("tailscale: " + strings.TrimSpace(fmt.Sprintf(format, args...)))
+	}
 	if err := t.srv.Start(); err != nil {
 		return err
 	}
@@ -53,7 +55,11 @@ func (t *tailnet) start(handler http.Handler, logger *slog.Logger) error {
 // bis MagicDNS und HTTPS-Zertifikate im Tailnet eingeschaltet sind.
 func (t *tailnet) serve(handler http.Handler, logger *slog.Logger) {
 	for {
-		ln, err := t.srv.ListenTLS("tcp", ":443")
+		err := t.fetchCert()
+		var ln net.Listener
+		if err == nil {
+			ln, err = t.srv.ListenTLS("tcp", ":443")
+		}
 		if err == nil {
 			t.ready()
 			go t.redirectHTTP()
@@ -66,6 +72,25 @@ func (t *tailnet) serve(handler http.Handler, logger *slog.Logger) {
 		logger.Warn("tailscale: HTTPS nicht bereit", "error", err)
 		time.Sleep(30 * time.Second)
 	}
+}
+
+// fetchCert holt das Zertifikat vor dem ersten Aufruf. Sonst holt tsnet es erst,
+// wenn ein Handy die Seite öffnet, und das kann beim ersten Mal scheitern.
+func (t *tailnet) fetchCert() error {
+	domains := t.srv.CertDomains()
+	if len(domains) == 0 {
+		return errors.New("noch keine https-adresse: magicdns und https certificates einschalten")
+	}
+	lc, err := t.srv.LocalClient()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	if _, _, err := lc.CertPair(ctx, domains[0]); err != nil {
+		return fmt.Errorf("zertifikat für %s: %w", domains[0], err)
+	}
+	return nil
 }
 
 func (t *tailnet) redirectHTTP() {
