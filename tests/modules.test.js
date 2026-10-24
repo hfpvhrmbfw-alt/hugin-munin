@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  tabLayout, serverAddress, addressFields, addressWarning, choreState, balances, settleUp, parseAmount, monthTotal,
-  nextBirthday, upcomingBirthdays, guessStorage, parseDayMonth, mealWeek, fromTemplate, visibleGifts, pinnedNotes, addMonths,
+  tabLayout, serverAddress, addressFields, choreState, balances, settleUp, parseAmount, monthTotal,
+  nextBirthday, upcomingBirthdays, parseDayMonth, mealWeek, fromTemplate, visibleGifts, pinnedNotes, addMonths,
 } from '../src/logic.js';
 import {
   sanitizeChore, sanitizeExpense, sanitizeContact, sanitizeMeal, sanitizeGift, sanitizeNote, sanitizeItem, sanitizeSettings,
@@ -31,7 +31,9 @@ test('Einstellungen: Module und Speicherort', () => {
   assert.equal(sanitizeSettings({ serverUrl: 'https://macmini.tail1.ts.net' }).storage, 'tailscale');
   assert.equal(sanitizeSettings({ serverUrl: 'https://planer.example.de' }).storage, 'domain');
   assert.equal(sanitizeSettings({}).storage, 'local');
-  assert.equal(sanitizeSettings({ storage: 'wireguard', serverUrl: 'http://10.0.0.2:8090' }).storage, 'wireguard');
+  // Frühere Wege (wireguard, heimnetz, gemietet) werden zu „andere adresse“, die Adresse bleibt.
+  assert.deepEqual(sanitizeSettings({ storage: 'wireguard', serverUrl: 'http://10.0.0.2:8090' }), { ...sanitizeSettings({}), storage: 'domain', serverUrl: 'http://10.0.0.2:8090' });
+  assert.equal(sanitizeSettings({ storage: 'hosted', serverUrl: 'https://x.pockethost.io' }).storage, 'domain');
 });
 
 test('Serveradresse je Speicherort', () => {
@@ -39,26 +41,18 @@ test('Serveradresse je Speicherort', () => {
   assert.deepEqual(serverAddress('tailscale', { host: 'macmini', tailnet: 'tail1234' }), { ok: true, url: 'https://macmini.tail1234.ts.net' });
   assert.deepEqual(serverAddress('tailscale', { host: 'https://macmini.tail1234.ts.net/' }), { ok: true, url: 'https://macmini.tail1234.ts.net' });
   assert.deepEqual(serverAddress('tailscale', { host: 'macmini' }), { ok: false, error: 'missing_host' });
-  assert.deepEqual(serverAddress('wireguard', { host: '10.8.0.1', port: '8090' }), { ok: true, url: 'http://10.8.0.1:8090' });
-  assert.deepEqual(serverAddress('lan', { host: 'macmini.local', port: '' }), { ok: true, url: 'http://macmini.local:8090' });
-  assert.deepEqual(serverAddress('lan', { host: 'mac mini', port: '' }), { ok: false, error: 'bad_host' });
-  assert.deepEqual(serverAddress('lan', { host: '192.168.1.5', port: '99999' }), { ok: false, error: 'bad_port' });
   assert.deepEqual(serverAddress('domain', { url: 'https://Planer.Example.de/' }), { ok: true, url: 'https://planer.example.de' });
   assert.deepEqual(serverAddress('domain', { url: 'http://planer.example.de' }), { ok: false, error: 'need_https' });
-  assert.deepEqual(serverAddress('hosted', { url: 'kein link' }), { ok: false, error: 'bad_url' });
+  assert.deepEqual(serverAddress('domain', { url: 'kein link' }), { ok: false, error: 'bad_url' });
+  assert.deepEqual(serverAddress('domain', { url: 'http://127.0.0.1:8090' }), { ok: true, url: 'http://127.0.0.1:8090' });
   assert.deepEqual(serverAddress('local', {}), { ok: true, url: '' });
 });
 
 test('Serveradresse wieder in Felder zerlegen', () => {
-  assert.deepEqual(addressFields('tailscale', 'https://macmini.tail1234.ts.net'), { host: 'macmini', tailnet: 'tail1234.ts.net', port: '8090', url: 'https://macmini.tail1234.ts.net' });
-  assert.equal(addressFields('lan', 'http://192.168.1.5:8091').port, '8091');
-  for (const [mode, f] of [['tailscale', { host: 'a', tailnet: 'b.ts.net' }], ['wireguard', { host: '10.0.0.1', port: '9000' }]]) {
-    const url = serverAddress(mode, f).url;
-    assert.equal(serverAddress(mode, addressFields(mode, url)).url, url);
-  }
-  assert.equal(addressWarning('http://10.0.0.1:8090', 'https:'), 'mixed');
-  assert.equal(addressWarning('http://10.0.0.1:8090', 'http:'), null);
-  assert.equal(addressWarning('https://x.ts.net', 'https:'), null);
+  assert.deepEqual(addressFields('tailscale', 'https://macmini.tail1234.ts.net'), { host: 'macmini', tailnet: 'tail1234.ts.net', url: 'https://macmini.tail1234.ts.net' });
+  assert.equal(addressFields('domain', 'https://planer.example.de').url, 'https://planer.example.de');
+  const url = serverAddress('tailscale', { host: 'a', tailnet: 'b.ts.net' }).url;
+  assert.equal(serverAddress('tailscale', addressFields('tailscale', url)).url, url);
 });
 
 for (const c of fixture('chores.json')) {
@@ -167,12 +161,7 @@ test('Export enthält alle Sammlungen und kommt gleich zurück', () => {
   assert.deepEqual(back.settings.modules, ['notes']);
 });
 
-test('Speicherort aus Adresse raten, Geburtstag eingeben', () => {
-  assert.equal(guessStorage(''), 'local');
-  assert.equal(guessStorage('https://macmini.tail1.ts.net'), 'tailscale');
-  assert.equal(guessStorage('http://10.8.0.1:8090'), 'wireguard');
-  assert.equal(guessStorage('http://192.168.178.20:8090'), 'lan');
-  assert.equal(guessStorage('https://planer.example.de'), 'domain');
+test('Geburtstag eingeben', () => {
   assert.equal(parseDayMonth('24.12.'), '12-24');
   assert.equal(parseDayMonth('1.2'), '02-01');
   assert.equal(parseDayMonth('29.02.'), '02-29');

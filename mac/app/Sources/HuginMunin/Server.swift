@@ -51,13 +51,7 @@ final class Server: ObservableObject {
     return base.appendingPathComponent("Hugin & Munin", isDirectory: true)
   }()
 
-  /// Bestehende Daten aus der Terminal-Einrichtung (docs/MAC-MINI.md) weiterverwenden.
-  static let dataDir: URL = {
-    let old = FileManager.default.homeDirectoryForCurrentUser
-      .appendingPathComponent("hugin-munin-server/pb_data", isDirectory: true)
-    if FileManager.default.fileExists(atPath: old.path) { return old }
-    return support.appendingPathComponent("pb_data", isDirectory: true)
-  }()
+  static let dataDir = support.appendingPathComponent("pb_data", isDirectory: true)
 
   static var backupsDir: URL { dataDir.appendingPathComponent("backups", isDirectory: true) }
 

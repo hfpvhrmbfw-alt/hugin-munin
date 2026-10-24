@@ -41,16 +41,12 @@ export const MODULE = {
 export const STORAGE = {
   local: ['nur auf diesem gerät', 'Kein Server, kein Konto. Teilen mit dem Partner geht dann nicht, eine Sicherung als Datei schon.'],
   tailscale: ['unser mac mini zu hause', 'Gemeinsam mit dem Partner, von überall erreichbar über die Tailscale-App. Empfohlen.'],
-  wireguard: ['eigener server über wireguard', 'Der Mac mini über einen eigenen WireGuard-Tunnel (z. B. von der FritzBox). Die WireGuard-App muss an sein.'],
-  lan: ['eigener server im heimnetz', 'Nur im WLAN zu Hause erreichbar. Unterwegs speichert die App und gleicht später ab.'],
-  domain: ['eigener server mit eigener adresse', 'Der Mac mini unter einer eigenen Domain mit HTTPS, z. B. über Cloudflare Tunnel.'],
-  hosted: ['gemieteter server', 'PocketBase bei einem Anbieter (z. B. PocketHost). Die Daten liegen dann nicht bei euch zu Hause.'],
+  domain: ['andere adresse', 'Ein anderer PocketBase-Server mit https-Adresse, z. B. eigene Domain oder ein Anbieter wie PocketHost.'],
 };
 
 export const ADDRESS_ERROR = {
   missing_host: 'Bitte die Adresse des Servers vollständig eintragen.',
   bad_host: 'Die Adresse enthält ungültige Zeichen (keine Leerzeichen, kein „/“).',
-  bad_port: 'Der Port muss eine Zahl zwischen 1 und 65535 sein (Standard 8090).',
   need_https: 'Hier ist nur eine https-Adresse sicher genug.',
   bad_url: 'Das sieht nicht wie eine Adresse aus, z. B. https://planer.example.de',
 };
@@ -66,8 +62,6 @@ export const CATEGORY = {
 
 export const REPEAT = { none: 'einmalig', daily: 'täglich', weekly: 'wöchentlich', monthly: 'monatlich', yearly: 'jährlich' };
 export const REPEAT_EVERY = { daily: 'tage', weekly: 'wochen', monthly: 'monate', yearly: 'jahre' };
-
-export const KIND = { shopping: 'einkaufsliste', tasks: 'aufgabenliste', project: 'projekt', template: 'vorlage' };
 
 export const THEME = { system: 'wie das Gerät', light: 'hell', dark: 'dunkel' };
 
@@ -90,14 +84,14 @@ export const SYNC = {
 };
 
 export const MSG = {
+  noStorage: 'Dieser Browser lässt Hugin & Munin nichts speichern. Ist ein privates Fenster offen? Dann bitte ein normales nehmen.',
   confirmImport: (n) => `${n} Einträge aus der Sicherung übernehmen? Gleiche Einträge werden überschrieben.`,
   imported: (n, skipped) => `${n} Einträge übernommen${skipped ? `, ${skipped} fehlerhafte übersprungen` : ''}.`,
   confirmLogout: 'Abmelden? Die Daten bleiben auf diesem Gerät.',
   confirmJoin: 'Beitreten? Deine bisherigen Einträge wandern in den neuen Haushalt.',
   loginFailed: 'Anmeldung fehlgeschlagen. E-Mail oder Passwort stimmen nicht.',
   registerFailed: 'Konto konnte nicht angelegt werden. Ist die E-Mail schon vergeben oder das Passwort kürzer als 8 Zeichen?',
-  serverUnreachable: 'Server nicht erreichbar. Stimmt die Adresse, und ist Tailscale bzw. WireGuard an?',
-  mixedContent: 'Diese Seite ist über https geöffnet, der Server spricht nur http. Das blockiert der Browser. Öffne die App dann direkt vom Server, also über die Adresse unten.',
+  serverUnreachable: 'Server nicht erreichbar. Stimmt die Adresse, und ist Tailscale an?',
   confirmModuleOff: (name) => `„${name}“ ausblenden? Die Einträge bleiben gespeichert und sind wieder da, wenn du es einschaltest.`,
   confirmDelete: 'Wirklich löschen?',
   noMembers: 'Wer wem etwas schuldet, steht hier, sobald ihr zu zweit im Haushalt seid (Mehr → Speicherort).',

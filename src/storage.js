@@ -1,4 +1,4 @@
-// Speicher: kleine Schnittstelle über IndexedDB, mit localStorage als Ersatz.
+// Speicher: kleine Schnittstelle über IndexedDB.
 // Kennt das Modell nur über die Sammlungsnamen. Die Logik kennt den Speicher nicht.
 import { COLLECTIONS } from './model.js';
 
@@ -16,21 +16,12 @@ const STORES = [...COLLECTIONS, 'meta'];
  * @property {()=>Promise<void>} clear
  */
 
-/** @returns {Promise<Store>} */
-export async function open() {
-  try {
-    if (!globalThis.indexedDB) throw new Error('no idb');
-    return await openIdb();
-  } catch {
-    return openLocal();
-  }
-}
-
 function req(r) {
   return new Promise((resolve, reject) => { r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
 }
 
-async function openIdb() {
+/** @returns {Promise<Store>} */
+export async function open() {
   const r = indexedDB.open(DB_NAME, DB_VERSION);
   r.onupgradeneeded = () => {
     const db = r.result;
@@ -51,19 +42,5 @@ async function openIdb() {
     getMeta: (k) => tx('meta', 'readonly', (st) => st.get(k)),
     setMeta: (k, v) => tx('meta', 'readwrite', (st) => { st.put(v, k); }),
     clear: async () => { for (const s of STORES) await tx(s, 'readwrite', (st) => { st.clear(); }); },
-  };
-}
-
-function openLocal() {
-  const key = (s) => `${DB_NAME}:${s}`;
-  const read = (s) => { try { return JSON.parse(localStorage.getItem(key(s)) || '{}'); } catch { return {}; } };
-  const write = (s, v) => localStorage.setItem(key(s), JSON.stringify(v));
-  return {
-    all: async (c) => Object.values(read(c)),
-    put: async (c, rec) => { const m = read(c); m[rec.id] = rec; write(c, m); },
-    putMany: async (c, recs) => { const m = read(c); for (const rec of recs) m[rec.id] = rec; write(c, m); },
-    getMeta: async (k) => read('meta')[k],
-    setMeta: async (k, v) => { const m = read('meta'); m[k] = v; write('meta', m); },
-    clear: async () => { for (const s of STORES) localStorage.removeItem(key(s)); },
   };
 }

@@ -1,5 +1,5 @@
 // Logik: reine Funktionen. Daten rein, Daten raus. "Heute" kommt immer als Parameter.
-import { SHOPPING_CATEGORIES, MEAL_SLOTS, TAB_MODULES, DEFAULT_PORT } from './model.js';
+import { SHOPPING_CATEGORIES, MEAL_SLOTS, TAB_MODULES } from './model.js';
 
 const DAY_MS = 86400000;
 
@@ -240,11 +240,10 @@ const HOST_RE = /^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-
  * Adresse aus den Feldern der Einrichtung bauen.
  *   tailscale: host (Gerätename) + tailnet (z. B. tail1234.ts.net) → https://host.tailnet
  *              Steht im Gerätenamen schon eine ganze Adresse, gilt sie.
- *   wireguard, lan: host (IP oder Name) + port → http://host:port
- *   domain, hosted: url, nur https
+ *   domain: url, nur https (http nur für localhost zum Ausprobieren)
  * @param {string} mode aus STORAGE_MODES
- * @param {{host?:string, tailnet?:string, port?:string|number, url?:string}} f
- * @returns {{ok:true, url:string} | {ok:false, error:'missing_host'|'bad_host'|'bad_port'|'need_https'|'bad_url'}}
+ * @param {{host?:string, tailnet?:string, url?:string}} f
+ * @returns {{ok:true, url:string} | {ok:false, error:'missing_host'|'bad_host'|'need_https'|'bad_url'}}
  */
 export function serverAddress(mode, f) {
   const t = (v) => String(v ?? '').trim();
@@ -259,56 +258,26 @@ export function serverAddress(mode, f) {
     }
     return HOST_RE.test(host) ? { ok: true, url: `https://${host}` } : { ok: false, error: 'bad_host' };
   }
-  if (mode === 'wireguard' || mode === 'lan') {
-    const host = t(f.host).replace(/^https?:\/\//i, '').replace(/\/+$/, '').toLowerCase();
-    const portText = t(f.port) || String(DEFAULT_PORT);
-    if (!host) return { ok: false, error: 'missing_host' };
-    if (!HOST_RE.test(host)) return { ok: false, error: 'bad_host' };
-    const port = Number(portText);
-    if (!/^\d+$/.test(portText) || port < 1 || port > 65535) return { ok: false, error: 'bad_port' };
-    return { ok: true, url: `http://${host}${port === 80 ? '' : `:${port}`}` };
-  }
   const url = t(f.url).replace(/\/+$/, '');
   if (!url) return { ok: false, error: 'missing_host' };
   const m = url.match(/^(https?):\/\/([^/:?#]+)(:\d{1,5})?(\/[^\s?#]*)?$/i);
   if (!m || !HOST_RE.test(m[2])) return { ok: false, error: 'bad_url' };
-  if (m[1].toLowerCase() !== 'https') return { ok: false, error: 'need_https' };
-  return { ok: true, url: `https://${m[2].toLowerCase()}${m[3] || ''}${m[4] || ''}` };
+  const host = m[2].toLowerCase();
+  const scheme = m[1].toLowerCase();
+  if (scheme !== 'https' && !['localhost', '127.0.0.1'].includes(host)) return { ok: false, error: 'need_https' };
+  return { ok: true, url: `${scheme}://${host}${m[3] || ''}${m[4] || ''}` };
 }
 
 /**
  * Umkehrung von serverAddress: gespeicherte Adresse in Felder zerlegen (zum Vorbelegen).
- * @returns {{host:string, tailnet:string, port:string, url:string}}
+ * @returns {{host:string, tailnet:string, url:string}}
  */
 export function addressFields(mode, url) {
-  const out = { host: '', tailnet: '', port: String(DEFAULT_PORT), url: url || '' };
-  const m = (url || '').match(/^https?:\/\/([^/:]+)(?::(\d+))?/i);
-  if (!m) return out;
-  if (mode === 'tailscale' && /\.ts\.net$/i.test(m[1])) {
-    const [host, ...rest] = m[1].split('.');
-    return { ...out, host, tailnet: rest.join('.') };
-  }
-  if (mode === 'wireguard' || mode === 'lan') return { ...out, host: m[1], port: m[2] || (url.startsWith('https') ? '443' : '80') };
-  return out;
-}
-
-/** Speicherort zu einer Adresse raten, z. B. wenn die App direkt vom Server geöffnet wurde. */
-export function guessStorage(url) {
-  const m = (url || '').match(/^(https?):\/\/([^/:]+)/i);
-  if (!m) return 'local';
-  if (/\.ts\.net$/i.test(m[2])) return 'tailscale';
-  if (m[1].toLowerCase() === 'https') return 'domain';
-  return /^10\./.test(m[2]) ? 'wireguard' : 'lan';
-}
-
-/**
- * Hinweis zur Adresse: eine http-Adresse lässt sich von einer https-Seite (z. B. GitHub Pages) nicht erreichen.
- * @param {string} url Serveradresse
- * @param {string} pageProtocol 'https:' oder 'http:' der geöffneten App
- * @returns {'mixed'|null}
- */
-export function addressWarning(url, pageProtocol) {
-  return pageProtocol === 'https:' && /^http:\/\//i.test(url || '') ? 'mixed' : null;
+  const out = { host: '', tailnet: '', url: url || '' };
+  const m = (url || '').match(/^https:\/\/([^/:]+\.ts\.net)/i);
+  if (mode !== 'tailscale' || !m) return out;
+  const [host, ...rest] = m[1].split('.');
+  return { ...out, host, tailnet: rest.join('.') };
 }
 
 // ---- Essensplan ---------------------------------------------------------------------
