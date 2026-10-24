@@ -39,7 +39,7 @@ Klappt Schritt 2 nicht, im Terminal einmal das hier eingeben, dann die App norma
 2. Nach ein paar Sekunden steht im Rabenmenü „tailscale verbunden“, darunter die **adresse für die handys**, etwa `https://hugin-munin.tail1234.ts.net`, und ein QR-Code.
 3. Steht dort „verbunden, https fehlt“: Schritt 1.2 nachholen (Knopf **dns-einstellungen öffnen**), dann ein, zwei Minuten warten.
 4. Im Rabenmenü **beim anmelden starten** einschalten.
-5. Test am Mac: **im browser öffnen**. Es dauert beim allerersten Mal bis zu einer Minute (das Zertifikat wird geholt), dann erscheint Hugin & Munin.
+5. Die Adresse funktioniert nur auf Geräten mit Tailscale-App. Am Mac mini selbst zeigt **im browser öffnen** darum „Server nicht gefunden“, solange dort keine Tailscale-App läuft. Das ist normal.
 
 ### 5. iPhone verbinden
 
@@ -50,13 +50,15 @@ Klappt Schritt 2 nicht, im Terminal einmal das hier eingeben, dann die App norma
 5. E-Mail, Passwort (mindestens 8 Zeichen) und deinen Namen eintragen, dann **Neues Konto**. Das ist dein normales Konto für die App, nicht das Verwaltungskonto aus Schritt 3.
 6. Danach an derselben Stelle einen Haushalt anlegen („Zuhause“ → **Haushalt anlegen**). Jetzt wandern deine Einträge auf den Mac mini.
 
+Zeigt Safari „Server nicht gefunden“: In der Tailscale-App muss „Connected“ stehen, das Gerät **hugin-munin** in der Liste auftauchen (sonst ist das iPhone mit einem anderen Konto angemeldet) und **Use Tailscale DNS** an sein. Beim allerersten Aufruf kann es bis zu einer Minute dauern.
+
 Vorher sicherheitshalber unter **mehr → sicherung** einmal **Sicherung speichern**.
 
 ### 6. Erster Test
 
 1. Auf dem iPhone einen Einkaufseintrag anlegen, z. B. „Test-Milch“.
-2. Am Mac mini die Adresse aus dem Rabenmenü im Browser öffnen, mit demselben Konto anmelden. Der Eintrag ist da.
-3. Am Mac etwas abhaken, auf dem iPhone kurz die App schließen und wieder öffnen: der Haken ist auch dort.
+2. Auf einem zweiten Gerät mit Tailscale-App (iPad, Handy des Partners) die Adresse aus dem Rabenmenü öffnen und mit demselben Konto anmelden. Der Eintrag ist da.
+3. Dort etwas abhaken, auf dem iPhone kurz die App schließen und wieder öffnen: der Haken ist auch dort.
 4. Unterwegs testen: am iPhone WLAN aus, Tailscale an. Die App sollte trotzdem abgleichen.
 5. Optional: unter **mehr → erinnerungen** einschalten und **Test senden**.
 
